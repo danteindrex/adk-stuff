@@ -1,0 +1,142 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: uganda-egov-helpdesk
+  labels:
+    app: uganda-egov-helpdesk
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: uganda-egov-helpdesk
+  template:
+    metadata:
+      labels:
+        app: uganda-egov-helpdesk
+    spec:
+      containers:
+      - name: app
+        image: uganda-egov-helpdesk:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: GOOGLE_CLOUD_PROJECT
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: google-cloud-project
+        - name: WHATSAPP_ACCESS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: whatsapp-access-token
+        - name: WHATSAPP_PHONE_NUMBER_ID
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: whatsapp-phone-number-id
+        - name: WHATSAPP_WEBHOOK_VERIFY_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: whatsapp-webhook-verify-token
+        - name: WHATSAPP_BUSINESS_ACCOUNT_ID
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: whatsapp-business-account-id
+        - name: FIREBASE_PROJECT_ID
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: firebase-project-id
+        - name: GOOGLE_OAUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: google-oauth-client-id
+        - name: GOOGLE_OAUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: google-oauth-client-secret
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: jwt-secret-key
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: encryption-key
+        - name: ADMIN_WHATSAPP_GROUP
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: admin-whatsapp-group
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: service-account
+          mountPath: /app/service-account.json
+          subPath: service-account.json
+          readOnly: true
+      volumes:
+      - name: service-account
+        secret:
+          secretName: google-service-account
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: uganda-egov-helpdesk-service
+spec:
+  selector:
+    app: uganda-egov-helpdesk
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: uganda-egov-helpdesk-metrics
+  labels:
+    app: uganda-egov-helpdesk
+spec:
+  selector:
+    app: uganda-egov-helpdesk
+  ports:
+  - name: metrics
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  clusterIP: None

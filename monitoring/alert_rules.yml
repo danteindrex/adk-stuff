@@ -1,0 +1,65 @@
+groups:
+  - name: uganda_egov_alerts
+    rules:
+      - alert: HighErrorRate
+        expr: rate(whatsapp_requests_total{status=~"5.."}[5m]) / rate(whatsapp_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(whatsapp_request_duration_seconds_bucket[5m])) > 5
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is {{ $value }}s"
+
+      - alert: ServiceDown
+        expr: up{job="uganda-egov-helpdesk"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service is down"
+          description: "Uganda E-Gov WhatsApp Helpdesk service is not responding"
+
+      - alert: HighMemoryUsage
+        expr: system_memory_usage_bytes / (1024^3) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanize }}GB"
+
+      - alert: HighCPUUsage
+        expr: system_cpu_usage_percent > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}%"
+
+      - alert: LowActiveSessionsHealth
+        expr: active_sessions_total < 1
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "Low session activity"
+          description: "Only {{ $value }} active sessions in the last 30 minutes"
+
+      - alert: AgentOperationFailures
+        expr: rate(agent_operations_total{status="error"}[10m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High agent operation failure rate"
+          description: "Agent operations failing at {{ $value }} per second"
