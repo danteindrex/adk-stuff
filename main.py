@@ -1,7 +1,7 @@
 """
 Uganda E-Gov WhatsApp Helpdesk
 Multi-Agent AI System for Government Service Access
-Production-Optimized Version with Comprehensive Monitoring and Testing
+Production-Optimized Version with Modular Architecture and Enhanced Browser Automation
 """
 
 import os
@@ -28,8 +28,8 @@ from app.core.config import settings
 from app.core.logging_config import setup_logging
 from app.api.webhooks import whatsapp_router
 from app.api.admin import admin_router
-# ADK agent system
-from app.agents.adk_agents import create_root_agent, cleanup_mcp_connections
+# ADK agent system - using modular architecture with enhanced browser automation
+from app.agents.adk_agents_modular import create_root_agent, cleanup_mcp_connections
 from app.services.google_session_manager import GoogleSessionManager
 from app.services.enhanced_monitoring import EnhancedMonitoringService
 
@@ -72,7 +72,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan management with comprehensive initialization"""
     global root_agent, session_manager, monitoring_service
     
-    logger.info("Starting Uganda E-Gov WhatsApp Helpdesk (Production Mode)...")
+    logger.info("Starting Uganda E-Gov WhatsApp Helpdesk (Modular Production Mode)...")
     
     try:
         # Initialize enhanced monitoring first
@@ -85,18 +85,18 @@ async def lifespan(app: FastAPI):
         await session_manager.start_cleanup_task()
         logger.info("Session manager initialized")
         
-        # Initialize ADK agent system
-        logger.info("Initializing ADK agent system...")
+        # Initialize modular ADK agent system
+        logger.info("Initializing modular ADK agent system with enhanced browser automation...")
         start_time = time.time()
         root_agent = await create_root_agent()
         init_time = time.time() - start_time
         await monitoring_service.record_agent_operation("root_agent", "initialization", "success", init_time)
-        logger.info(f"ADK agent system initialized successfully in {init_time:.2f}s")
+        logger.info(f"Modular ADK agent system initialized successfully in {init_time:.2f}s")
         
         # Validate all services
         await _validate_services()
         
-        logger.info("All services initialized successfully - System ready")
+        logger.info("All services initialized successfully - Modular system ready")
         yield
         
     except Exception as e:
@@ -120,8 +120,8 @@ async def lifespan(app: FastAPI):
 # Create FastAPI application with production settings
 app = FastAPI(
     title="Uganda E-Gov WhatsApp Helpdesk",
-    description="Multi-Agent AI System for Government Service Access",
-    version="1.0.0",
+    description="Multi-Agent AI System for Government Service Access with Modular Architecture",
+    version="2.0.0",
     lifespan=lifespan,
     docs_url="/docs" if settings.ENVIRONMENT == "development" else None,
     redoc_url="/redoc" if settings.ENVIRONMENT == "development" else None,
@@ -191,11 +191,11 @@ async def monitor_requests(request: Request, call_next):
 # Include routers
 app.include_router(admin_router, prefix="/admin", tags=["Admin"])
 
-# Production-optimized WhatsApp webhook endpoint
+# Production-optimized WhatsApp webhook endpoint with enhanced automation
 @app.post("/whatsapp/webhook")
 @limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
 async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
-    """WhatsApp webhook endpoint with rate limiting and comprehensive error handling"""
+    """WhatsApp webhook endpoint with enhanced browser automation and comprehensive error handling"""
     start_time = time.time()
     
     try:
@@ -222,13 +222,15 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
         # Log incoming message
         logger.info(f"Processing WhatsApp message from {user_id}: {user_text[:100]}...")
         
-        # Route to ADK agent with timeout
+        # Route to modular ADK agent with timeout
         try:
             adk_response = await asyncio.wait_for(
                 root_agent.run_async({
                     "user_id": user_id,
                     "text": user_text,
-                    "raw": message
+                    "raw": message,
+                    "automation_enabled": True,  # Enable enhanced automation
+                    "fallback_enabled": True     # Enable browser-use fallback
                 }),
                 timeout=settings.REQUEST_TIMEOUT_SECONDS
             )
@@ -249,7 +251,7 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
                     "root_agent", "whatsapp_message", "success", processing_time
                 )
                 
-                logger.info(f"Processed message in {processing_time:.2f}s")
+                logger.info(f"Processed message with modular system in {processing_time:.2f}s")
                 return JSONResponse({"reply": response_text})
             else:
                 await monitoring_service.log_error("agent_response", "No final response from agent", {
@@ -284,9 +286,17 @@ async def root():
     """Root endpoint with system information"""
     return {
         "message": "Uganda E-Gov WhatsApp Helpdesk API",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "status": "operational",
         "environment": settings.ENVIRONMENT,
+        "architecture": "modular",
+        "features": [
+            "Enhanced browser automation with Playwright + Browser-Use fallback",
+            "Modular agent architecture",
+            "Multi-language support",
+            "Comprehensive monitoring",
+            "Production-optimized performance"
+        ],
         "services": {
             "whatsapp_webhook": "/whatsapp/webhook",
             "admin_dashboard": "/admin/dashboard",
@@ -303,6 +313,7 @@ async def health_check():
         health_status = {
             "status": "healthy",
             "timestamp": datetime.now().isoformat(),
+            "architecture": "modular",
             "services": {},
             "metrics": {}
         }
@@ -345,7 +356,7 @@ async def readiness_check():
     """Kubernetes readiness probe"""
     if not all([session_manager, monitoring_service, root_agent]):
         raise HTTPException(status_code=503, detail="Service not ready")
-    return {"status": "ready"}
+    return {"status": "ready", "architecture": "modular"}
 
 @app.get("/metrics", response_class=PlainTextResponse)
 async def metrics():
@@ -362,6 +373,46 @@ async def admin_metrics():
         raise HTTPException(status_code=503, detail="Monitoring service not available")
     
     return await monitoring_service.get_metrics_summary()
+
+@app.get("/system/info")
+async def system_info():
+    """System architecture information"""
+    return {
+        "architecture": "modular",
+        "version": "2.0.0",
+        "components": {
+            "mcp_servers": [
+                "auth_tools",
+                "playwright_tools", 
+                "browser_use_tools",
+                "whatsapp_tools"
+            ],
+            "core_agents": [
+                "auth_agent",
+                "language_agent",
+                "intent_agent", 
+                "help_agent"
+            ],
+            "service_agents": [
+                "birth_agent",
+                "tax_agent",
+                "nssf_agent",
+                "land_agent",
+                "form_agent"
+            ]
+        },
+        "automation": {
+            "primary": "Playwright MCP",
+            "fallback": "Browser-Use Agent",
+            "features": [
+                "Smart web automation",
+                "Government portal integration",
+                "Screenshot capture",
+                "Data extraction",
+                "Error recovery"
+            ]
+        }
+    }
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -381,7 +432,8 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={
             "error": "Internal server error",
             "message": "An unexpected error occurred. Our team has been notified.",
-            "request_id": id(request)  # Simple request ID for tracking
+            "request_id": id(request),  # Simple request ID for tracking
+            "architecture": "modular"
         }
     )
 
