@@ -194,10 +194,16 @@ async def monitor_requests(request: Request, call_next):
 app.include_router(admin_router, prefix="/admin", tags=["Admin"])
 
 # Production-optimized WhatsApp webhook endpoint with enhanced automation
+# Update imports
+from app.services.twilio_client import TwilioClient
+
+# Replace WhatsApp client initialization with Twilio
+twilio_client = TwilioClient()
+
+# Update webhook endpoint
 @app.post("/whatsapp/webhook")
-@limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
 async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
-    """WhatsApp webhook endpoint with enhanced browser automation and comprehensive error handling"""
+    """Twilio WhatsApp webhook endpoint with enhanced browser automation and comprehensive error handling"""
     start_time = time.time()
     
     try:

@@ -10,7 +10,13 @@ from fastapi.testclient import TestClient
 from httpx import AsyncClient
 
 # Set test environment
-os.environ["ENVIRONMENT"] = "test"
+# Add Twilio test environment variables
+os.environ["TWILIO_ACCOUNT_SID"] = "test_account_sid"
+os.environ["TWILIO_AUTH_TOKEN"] = "test_auth_token"
+os.environ["TWILIO_WHATSAPP_NUMBER"] = "test_whatsapp_number"
+os.environ["TWILIO_WEBHOOK_VERIFY_TOKEN"] = "test_verify_token"
+
+# Legacy WhatsApp variables (can be kept for backward compatibility)
 os.environ["WHATSAPP_ACCESS_TOKEN"] = "test_token"
 os.environ["WHATSAPP_PHONE_NUMBER_ID"] = "test_phone_id"
 os.environ["WHATSAPP_WEBHOOK_VERIFY_TOKEN"] = "test_verify_token"

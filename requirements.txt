@@ -45,3 +45,6 @@ structlog
 
 # Basic monitoring (simplified)
 prometheus-client
+
+# Add this line to your existing requirements
+twilio>=7.16.0

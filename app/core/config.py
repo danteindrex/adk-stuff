@@ -15,11 +15,18 @@ class Settings(BaseSettings):
     DEBUG: bool = Field(default=False, env="DEBUG")
     LOG_LEVEL: str = Field(default="INFO", env="LOG_LEVEL")
     
-    # WhatsApp Business API
-    WHATSAPP_ACCESS_TOKEN: str = Field(..., env="WHATSAPP_ACCESS_TOKEN")
-    WHATSAPP_PHONE_NUMBER_ID: str = Field(..., env="WHATSAPP_PHONE_NUMBER_ID")
-    WHATSAPP_WEBHOOK_VERIFY_TOKEN: str = Field(..., env="WHATSAPP_WEBHOOK_VERIFY_TOKEN")
-    WHATSAPP_BUSINESS_ACCOUNT_ID: str = Field(..., env="WHATSAPP_BUSINESS_ACCOUNT_ID")
+    # Twilio WhatsApp Configuration
+    TWILIO_ACCOUNT_SID: str = Field(..., env="TWILIO_ACCOUNT_SID")
+    TWILIO_AUTH_TOKEN: str = Field(..., env="TWILIO_AUTH_TOKEN")
+    TWILIO_WHATSAPP_NUMBER: str = Field(..., env="TWILIO_WHATSAPP_NUMBER")
+    TWILIO_WEBHOOK_VERIFY_TOKEN: str = Field(..., env="TWILIO_WEBHOOK_VERIFY_TOKEN")
+    TWILIO_API_KEY_SID: Optional[str] = Field(None, env="TWILIO_API_KEY_SID")
+    
+    # Legacy WhatsApp Business API (can be removed after migration)
+    WHATSAPP_ACCESS_TOKEN: Optional[str] = Field(None, env="WHATSAPP_ACCESS_TOKEN")
+    WHATSAPP_PHONE_NUMBER_ID: Optional[str] = Field(None, env="WHATSAPP_PHONE_NUMBER_ID")
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: Optional[str] = Field(None, env="WHATSAPP_WEBHOOK_VERIFY_TOKEN")
+    WHATSAPP_BUSINESS_ACCOUNT_ID: Optional[str] = Field(None, env="WHATSAPP_BUSINESS_ACCOUNT_ID")
     
     # Firebase Configuration (for FAQ caching)
     FIREBASE_PROJECT_ID: Optional[str] = Field(None, env="FIREBASE_PROJECT_ID")
