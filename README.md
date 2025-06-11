@@ -1,14 +1,15 @@
 # 🇺🇬 Uganda E-Gov WhatsApp Helpdesk
 
-A multi-agent AI system that enables 45+ million Ugandans to access critical government services entirely through WhatsApp messages, eliminating digital divide barriers and website navigation complexity.
+A simplified, production-ready multi-agent AI system that enables 45+ million Ugandans to access critical government services entirely through WhatsApp messages, eliminating digital divide barriers and website navigation complexity.
 
 ## 🌟 Project Vision
 
-Build a hackathon-winning multi-agent AI system that enables citizens to access government services without ever leaving WhatsApp, supporting multiple local languages and providing autonomous service delivery through intelligent agent collaboration.
+Enable citizens to access government services without ever leaving WhatsApp, supporting multiple local languages and providing autonomous service delivery through intelligent agent collaboration.
 
 ## 🚀 Core Innovation
 
 - **Zero Website Interaction**: Citizens never leave WhatsApp
+- **Simple Phone-Based Authentication**: Users identified by phone numbers (WhatsApp verified)
 - **Multi-Language Support**: English, Luganda, Luo, Runyoro with automatic detection
 - **Autonomous Service Delivery**: Agents collaborate to complete complex government processes
 - **Real-World Impact**: Addresses genuine infrastructure and accessibility challenges in Uganda
@@ -20,17 +21,15 @@ Build a hackathon-winning multi-agent AI system that enables citizens to access 
 - **Frontend**: WhatsApp Business API (Cloud API)
 - **Backend**: FastAPI (Python) for webhook handling and API management
 - **Multi-Agent Orchestration**: Google Agent Development Kit (ADK) patterns
-- **Database**: Google Cloud Firestore (with Firebase Authentication)
-- **Browser Automation**: Microsoft MCP Server with Playwright + Browser-Use agent fallback
-- **Infrastructure**: Google Cloud Run + Google Cloud Functions
-- **Monitoring**: Google Cloud Monitoring + Custom Dashboard
+- **Session Management**: Redis for lightweight session storage
+- **Browser Automation**: Playwright MCP + Browser-Use AI agent fallback
+- **Infrastructure**: Docker, Kubernetes, Google Cloud Run ready
+- **Monitoring**: Simple monitoring with structured logging
 
-### Modular Multi-Agent System Design
-
-The system uses a modular architecture with specialized components:
+### Simplified Multi-Agent System Design
 
 #### Core Agents (`app/agents/core_agents/`)
-1. **AuthenticationAgent** - Firebase-based secure user verification and session management
+1. **UserIdentificationAgent** - Simple phone-based user identification
 2. **LanguageDetectionAgent** - Seamless multilingual experience with automatic translation
 3. **IntentClassificationAgent** - Intelligent routing to appropriate service agents
 4. **HelpSystemAgent** - Contextual assistance and guidance
@@ -43,9 +42,10 @@ The system uses a modular architecture with specialized components:
 5. **FormProcessingAgent** - Government form assistance and submission
 
 #### MCP Servers (`app/agents/mcp_servers/`)
-1. **Playwright Tools** - Enhanced browser automation with intelligent fallback
-2. **WhatsApp Tools** - WhatsApp Business API integration
-3. **Auth Tools** - Google Firebase authentication and user management
+1. **User Identification Tools** - Phone-based user identification
+2. **Playwright Tools** - Enhanced browser automation with intelligent fallback
+3. **Browser-Use Tools** - AI-powered browser automation for complex scenarios
+4. **WhatsApp Tools** - WhatsApp Business API integration
 
 ## 🎯 Supported Government Services
 
@@ -94,111 +94,124 @@ Available in any conversation state:
 - `help` - Show contextual help and guidance
 - `status` - Display current session status
 - `language` - Change language preference
-- `logout` - End session securely
 - `admin` - Emergency admin contact information
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Google Cloud Project with billing enabled
-- WhatsApp Business API access
-- Firebase project setup
-- Docker installed locally
+- **Python 3.8+** with pip
+- **Node.js 18+** with npm
+- **Redis** server (for session management)
+- **WhatsApp Business API** account and credentials
 
 ### 1. Clone and Setup
 ```bash
 git clone <repository-url>
 cd adk-stuff
-cp .env.example .env
-# Edit .env with your configuration
-```
 
-### 2. Google Cloud Setup
-```bash
-# Enable required APIs
-gcloud services enable identitytoolkit.googleapis.com
-gcloud services enable firebase.googleapis.com
-gcloud services enable firestore.googleapis.com
-gcloud services enable logging.googleapis.com
-gcloud services enable monitoring.googleapis.com
-
-# Create service account
-gcloud iam service-accounts create uganda-egov-service \
-    --display-name="Uganda E-Gov Service Account"
-
-# Download service account key
-gcloud iam service-accounts keys create service-account.json \
-    --iam-account=uganda-egov-service@YOUR_PROJECT_ID.iam.gserviceaccount.com
-```
-
-### 3. Firebase Setup
-1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Create project or import Google Cloud project
-3. Enable Authentication and configure providers
-4. Enable Firestore Database
-
-### 4. Local Development
-```bash
-# Install dependencies
+# Install Python dependencies
 pip install -r requirements.txt
+```
 
-# Set environment variables
-export GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
-export FIREBASE_PROJECT_ID=your-firebase-project-id
-export GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+### 2. Setup MCP Servers
+```bash
+# Run the automated setup script
+chmod +x scripts/setup_mcp_servers.sh
+./scripts/setup_mcp_servers.sh
 
-# Run locally
+# Or install manually:
+npm install -g @playwright/mcp@latest
+npm install -g @lharries/whatsapp-mcp@latest
+pip install browser-use
+npx playwright install
+```
+
+### 3. Environment Configuration
+```bash
+# Copy the production template
+cp .env.production.template .env
+
+# Edit .env with your credentials
+nano .env
+```
+
+**Required Environment Variables:**
+
+```env
+# WhatsApp Business API (Required)
+WHATSAPP_ACCESS_TOKEN=your_whatsapp_access_token
+WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
+WHATSAPP_WEBHOOK_VERIFY_TOKEN=your_webhook_verify_token
+WHATSAPP_BUSINESS_ACCOUNT_ID=your_business_account_id
+
+# Security (Required)
+JWT_SECRET_KEY=your_jwt_secret_key_minimum_32_characters_long
+ENCRYPTION_KEY=your_encryption_key_exactly_32_characters
+ADMIN_WHATSAPP_GROUP=your_admin_whatsapp_group_id
+
+# Redis (Required for session management)
+REDIS_URL=redis://localhost:6379
+
+# MCP Servers (Required for browser automation)
+MCP_SERVER_URLS=http://localhost:8001
+```
+
+### 4. Start the Application
+```bash
+# Start Redis server
+redis-server &
+
+# Start the application
 python main.py
 ```
 
-### 5. Deploy to Google Cloud Run
-```bash
-# Make deploy script executable
-chmod +x deploy.sh
+The application will be available at `http://localhost:8080`
 
-# Deploy to Cloud Run
-./deploy.sh
-```
-
-### 6. Configure WhatsApp Webhook
+### 5. Configure WhatsApp Webhook
 Set your WhatsApp Business API webhook URL to:
 ```
-https://your-service-url.run.app/whatsapp/webhook
+https://your-service-url/whatsapp/webhook
 ```
 
-## 🔧 Configuration
+## 🔧 Production Deployment
 
-### Required Environment Variables
-
+### Docker Deployment
 ```bash
-# WhatsApp Business API
-WHATSAPP_ACCESS_TOKEN=your_access_token
-WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
-WHATSAPP_WEBHOOK_VERIFY_TOKEN=your_verify_token
-WHATSAPP_BUSINESS_ACCOUNT_ID=your_business_account_id
+# Build production image
+docker build -f Dockerfile.prod -t uganda-egov-helpdesk .
 
-# Google Cloud Authentication
-GOOGLE_OAUTH_CLIENT_ID=your_oauth_client_id
-GOOGLE_OAUTH_CLIENT_SECRET=your_oauth_client_secret
-FIREBASE_PROJECT_ID=your_firebase_project_id
-GOOGLE_CLOUD_PROJECT=your_gcp_project_id
-GOOGLE_APPLICATION_CREDENTIALS=path/to/service-account.json
+# Run with environment file
+docker run -d \
+  --name uganda-egov-helpdesk \
+  --env-file .env \
+  -p 8080:8080 \
+  uganda-egov-helpdesk
+```
 
-# Security
-JWT_SECRET_KEY=your-super-secret-jwt-key
-ENCRYPTION_KEY=your-32-character-encryption-key
-ADMIN_WHATSAPP_GROUP=admin_group_id
+### Docker Compose
+```bash
+# Start all services including Redis
+docker-compose up -d
 
-# Optional
-REDIS_URL=redis://localhost:6379
-MCP_SERVER_URLS=http://mcp-server-1:8000
+# View logs
+docker-compose logs -f
+```
+
+### Kubernetes Deployment
+```bash
+# Apply Kubernetes manifests
+kubectl apply -f k8s/
+
+# Check deployment status
+kubectl get pods
+kubectl get services
 ```
 
 ## 📊 Admin Dashboard
 
 Access the real-time admin dashboard at:
 ```
-https://your-service-url.run.app/static/admin.html
+https://your-service-url/admin/dashboard
 ```
 
 ### Dashboard Features
@@ -209,9 +222,16 @@ https://your-service-url.run.app/static/admin.html
 - Performance metrics
 - Error tracking and alerts
 
-## 🔒 Security Features
+## 🔒 Simplified Security Model
 
-- **Session Management**: Secure Firebase-based sessions with automatic expiry
+### Phone-Based Authentication
+- **No complex login required** - users identified by WhatsApp phone numbers
+- **WhatsApp verification** - phone ownership already verified by WhatsApp Business API
+- **Automatic normalization** - phone numbers formatted to Uganda standard (+256)
+- **Session management** - lightweight Redis-based sessions
+- **Audit logging** - all interactions logged for compliance
+
+### Security Features
 - **Rate Limiting**: Protection against abuse and spam
 - **Input Validation**: Comprehensive sanitization of user inputs
 - **Data Encryption**: Sensitive data encrypted at rest
@@ -228,33 +248,47 @@ https://your-service-url.run.app/static/admin.html
 - Language distribution
 - Popular services
 
-### Alerting
-- High error rates
-- Service degradation
-- Performance issues
-- Security events
-- System health status
+### Health Check Endpoints
+- **Basic Health**: `GET /health`
+- **Readiness**: `GET /ready`
+- **Metrics**: `GET /metrics`
+- **System Info**: `GET /system/info`
+
+## 🚀 Enhanced Browser Automation
+
+The system features intelligent browser automation with multiple fallback mechanisms:
+
+### Automation Strategy
+1. **Primary**: Playwright MCP tools for fast, reliable automation
+2. **Secondary**: Browser-Use AI agent for complex scenarios
+3. **Smart**: Combined approach with automatic fallbacks
+4. **Manual**: Step-by-step instructions when automation fails
+
+### Smart Features
+- AI-powered browser automation with natural language tasks
+- Retry logic with exponential backoff
+- Automatic error detection and recovery
+- Screenshot verification of operations
+- Data validation and sanitization
+- Graceful timeout handling
 
 ## 🧪 Testing
 
-### Test User Accounts
+### Sample User Interactions
 ```
-Username: john_doe, Password: password123, Phone: +256700000001
-Username: mary_nakato, Password: password123, Phone: +256700000002
-Username: peter_okello, Password: password123, Phone: +256700000003
-Username: sarah_tumusiime, Password: password123, Phone: +256700000004
-```
-
-### Sample Interactions
-```
-User: login john_doe password123
-Bot: ✅ Welcome back, John! You're now logged in.
+User: Hello
+Bot: 🇺🇬 Welcome to Uganda E-Gov Services! I can help you with:
+     1. Birth Certificate (NIRA)
+     2. Tax Status (URA)
+     3. NSSF Balance
+     4. Land Verification (NLIS)
 
 User: birth certificate
-Bot: Please provide your NIRA reference number...
+Bot: Please provide your NIRA reference number (format: NIRA/YYYY/NNNNNN)
 
 User: NIRA/2025/001234
 Bot: 🎉 Your birth certificate is ready for collection at Kampala URSB!
+     Collection hours: Monday-Friday, 8:00 AM - 5:00 PM
 ```
 
 ### Running Tests
@@ -262,52 +296,94 @@ Bot: 🎉 Your birth certificate is ready for collection at Kampala URSB!
 # Run all tests
 python -m pytest tests/
 
-# Run specific test categories
-python -m pytest tests/test_agents.py
-python -m pytest tests/test_integration.py
-python -m pytest tests/test_performance.py
-
 # Run with coverage
 python -m pytest --cov=app tests/
 ```
 
-## 🚀 Enhanced Browser Automation
+## 🛠️ Troubleshooting
 
-The system features intelligent browser automation with multiple fallback mechanisms:
+### Common Issues
 
-### Automation Flow
-1. **Primary**: Playwright MCP tools for fast, reliable automation
-2. **Fallback**: Browser-Use agent for AI-powered automation
-3. **Manual**: Step-by-step user guidance when automation fails
+1. **MCP Server Connection Failed**
+   ```bash
+   # Check if MCP servers are installed
+   npx @playwright/mcp@latest --help
+   npx @lharries/whatsapp-mcp@latest --help
+   
+   # Reinstall if needed
+   npm install -g @playwright/mcp@latest
+   ```
 
-### Smart Features
-- Retry logic with exponential backoff
-- Automatic error detection and recovery
-- Screenshot verification of operations
-- Data validation and sanitization
-- Graceful timeout handling
+2. **Browser-Use Import Error**
+   ```bash
+   # Install browser-use
+   pip install browser-use
+   
+   # Test import
+   python -c "import browser_use; print('OK')"
+   ```
 
-## 🏆 Hackathon Success Strategy
+3. **WhatsApp API Errors**
+   - Verify your access token is valid
+   - Check phone number ID is correct
+   - Ensure webhook verify token matches
 
-### Technical Excellence (50%)
-- ✅ Clean multi-agent architecture with modular design
-- ✅ Robust error handling and graceful failures
-- ✅ Scalable cloud-native design
-- ✅ Security best practices with Firebase integration
-- ✅ Performance optimization with intelligent caching
+4. **Redis Connection Issues**
+   ```bash
+   # Start Redis
+   redis-server
+   
+   # Test connection
+   redis-cli ping
+   ```
 
-### Innovation & Creativity (30%)
-- ✅ Social impact addressing real infrastructure challenges
-- ✅ Sophisticated multi-agent collaboration
-- ✅ Cultural localization beyond simple translation
-- ✅ Zero-digital-divide design
-- ✅ Novel government integration approach
+### Debug Mode
 
-### Demo & Documentation (20%)
-- ✅ Compelling demo showcasing real service completion
-- ✅ Clear architecture visualization
-- ✅ Comprehensive documentation
-- ✅ Production-ready deployment
+Enable debug mode for detailed logging:
+
+```env
+DEBUG=true
+LOG_LEVEL=DEBUG
+```
+
+## 🎯 Key Improvements Made
+
+### ✅ Simplified Authentication
+- **Removed complex Google OAuth/Firebase** authentication
+- **Phone-based identification** - users identified by WhatsApp phone numbers
+- **No registration required** - immediate service access
+- **Automatic phone formatting** to Uganda standard (+256)
+
+### ✅ Complete MCP Server Setup
+- **Playwright MCP Server** for reliable browser automation
+- **WhatsApp MCP Server** for Business API integration
+- **Browser-Use Tools** for AI-powered automation fallback
+- **Automated setup script** for easy deployment
+
+### ✅ Production Ready
+- **No demo/mock data** - all metrics from real usage
+- **Simplified dependencies** - removed unnecessary Google Cloud services
+- **Production environment template** with all required variables
+- **Comprehensive setup documentation**
+
+### ✅ Enhanced Automation
+- **Smart fallback mechanisms** - Playwright → Browser-Use → Manual
+- **Government portal integration** for all major Uganda services
+- **AI-powered automation** for complex scenarios
+- **Error recovery and retry logic**
+
+## 📋 Production Checklist
+
+Before deploying to production:
+
+- [ ] **MCP Servers installed** (run `./scripts/setup_mcp_servers.sh`)
+- [ ] **Environment configured** (copy and edit `.env.production.template`)
+- [ ] **WhatsApp Business API** credentials configured
+- [ ] **Redis server** running and accessible
+- [ ] **Security keys** generated (JWT_SECRET_KEY, ENCRYPTION_KEY)
+- [ ] **Webhook URL** configured in Meta Developer Console
+- [ ] **Health checks** passing (`/health`, `/ready`)
+- [ ] **Admin dashboard** accessible and showing real data
 
 ## 🎯 Success Metrics
 
@@ -329,23 +405,23 @@ The system features intelligent browser automation with multiple fallback mechan
 ```
 /app
 ├── agents/
-│   ├── core_agents/          # Authentication, Language, Intent, Help
+│   ├── core_agents/          # User ID, Language, Intent, Help
 │   ├── service_agents/       # Government service automation
 │   ├── mcp_servers/          # MCP tool integrations
 │   └── adk_agents_modular.py # Main agent orchestration
 ├── api/                      # FastAPI endpoints
 ├── core/                     # Configuration and logging
-├── database/                 # Firestore client
 ├── models/                   # Data models
 └── services/                 # Supporting services
 ```
 
 ### Key Features
-- **Intelligent Routing**: Intent classification routes to appropriate agents
-- **Session Persistence**: Firebase-based session management
-- **Error Recovery**: Multiple fallback mechanisms for reliability
-- **Real-time Monitoring**: Comprehensive logging and metrics
-- **Scalable Design**: Cloud-native architecture for high availability
+- **Simplified user identification** by phone number
+- **Intelligent routing** with intent classification
+- **Lightweight session management** with Redis
+- **Multi-level automation** with smart fallbacks
+- **Real-time monitoring** with simple logging
+- **Production-ready** deployment options
 
 ## 🤝 Contributing
 
@@ -361,7 +437,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🆘 Support
 
-- **Documentation**: Check this README and inline code comments
+- **Setup Guide**: See `PRODUCTION_CHECKLIST.md` for deployment verification
 - **Issues**: Create a GitHub issue for bugs or feature requests
 - **Emergency**: Contact admin through the WhatsApp bot using 'admin' command
 
@@ -369,12 +445,26 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - Uganda Government for digital transformation initiatives
 - WhatsApp Business API for messaging platform
-- Google Cloud for infrastructure and ADK framework
-- Firebase for authentication services
+- Google ADK framework for multi-agent orchestration
+- Microsoft Playwright for browser automation
+- Browser-Use project for AI-powered automation
 - The open-source community for tools and libraries
 
 ---
 
 **Built with ❤️ for Uganda's digital future**
 
-*This system demonstrates how AI can bridge the digital divide and make government services accessible to all citizens, regardless of their technical literacy or internet access.*
+*This system demonstrates how AI can bridge the digital divide and make government services accessible to all citizens, regardless of their technical literacy or internet access - now production-ready with simplified authentication and comprehensive automation capabilities.*
+
+## 🚀 Ready to Deploy!
+
+The Uganda E-Gov WhatsApp Helpdesk is now **production-ready** with:
+
+- ✅ **Simplified phone-based authentication**
+- ✅ **Complete MCP server setup and automation**
+- ✅ **Zero demo/mock data - all real metrics**
+- ✅ **Comprehensive documentation and setup guides**
+- ✅ **Multi-language support for Uganda**
+- ✅ **Government service integration ready**
+
+**Start serving citizens through WhatsApp today!** 🇺🇬

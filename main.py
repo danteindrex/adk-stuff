@@ -31,7 +31,7 @@ from app.api.admin import admin_router
 # ADK agent system - using modular architecture with enhanced browser automation
 from app.agents.adk_agents_modular import create_root_agent, cleanup_mcp_connections
 from app.services.google_session_manager import GoogleSessionManager
-from app.services.enhanced_monitoring import EnhancedMonitoringService
+from app.services.simple_monitoring import MonitoringService
 
 # Load environment variables
 load_dotenv()
@@ -56,15 +56,15 @@ async def _validate_services():
         logger.info(f"Session manager validation: {stats}")
         
         # Test monitoring service
-        summary = await monitoring_service.get_metrics_summary()
+        summary = await monitoring_service.get_system_health_summary()
         logger.info("Monitoring service validation: OK")
         
-        # Update monitoring with validation success
-        await monitoring_service.record_agent_operation("system", "validation", "success")
+        # Log validation success
+        await monitoring_service.log_conversation_event({"event": "validation", "status": "success"})
         
     except Exception as e:
         logger.error(f"Service validation failed: {e}")
-        await monitoring_service.log_error("validation_error", str(e))
+        await monitoring_service.log_error_event("validation_error", str(e), {})
         raise
 
 @asynccontextmanager
@@ -75,10 +75,10 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Uganda E-Gov WhatsApp Helpdesk (Modular Production Mode)...")
     
     try:
-        # Initialize enhanced monitoring first
-        monitoring_service = EnhancedMonitoringService()
+        # Initialize simple monitoring first
+        monitoring_service = MonitoringService()
         await monitoring_service.start_monitoring()
-        logger.info("Enhanced monitoring service started")
+        logger.info("Simple monitoring service started")
         
         # Initialize session manager
         session_manager = GoogleSessionManager()
@@ -90,7 +90,7 @@ async def lifespan(app: FastAPI):
         start_time = time.time()
         root_agent = await create_root_agent()
         init_time = time.time() - start_time
-        await monitoring_service.record_agent_operation("root_agent", "initialization", "success", init_time)
+        await monitoring_service.log_conversation_event({"event": "agent_initialization", "duration": init_time, "status": "success"})
         logger.info(f"Modular ADK agent system initialized successfully in {init_time:.2f}s")
         
         # Validate all services
@@ -102,14 +102,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to initialize services: {e}")
         if monitoring_service:
-            await monitoring_service.log_error("startup_error", str(e), {"phase": "initialization"})
+            await monitoring_service.log_error_event("startup_error", str(e), {"phase": "initialization"})
         raise
     finally:
         logger.info("Shutting down services gracefully...")
         
         # Stop monitoring first to capture shutdown metrics
         if monitoring_service:
-            await monitoring_service.log_error("shutdown", "System shutdown initiated", {"phase": "cleanup"})
+            await monitoring_service.log_error_event("shutdown", "System shutdown initiated", {"phase": "cleanup"})
             await monitoring_service.stop_monitoring()
         
         # Cleanup MCP connections
@@ -157,14 +157,15 @@ async def monitor_requests(request: Request, call_next):
         response = await call_next(request)
         duration = time.time() - start_time
         
-        # Record metrics
+        # Log request
         if monitoring_service:
-            await monitoring_service.record_request(
-                method=request.method,
-                endpoint=request.url.path,
-                status_code=response.status_code,
-                duration=duration
-            )
+            await monitoring_service.log_conversation_event({
+                "event": "http_request",
+                "method": request.method,
+                "endpoint": request.url.path,
+                "status_code": response.status_code,
+                "duration": duration
+            })
         
         # Add performance headers
         response.headers["X-Process-Time"] = str(duration)
@@ -174,13 +175,14 @@ async def monitor_requests(request: Request, call_next):
         duration = time.time() - start_time
         
         if monitoring_service:
-            await monitoring_service.record_request(
-                method=request.method,
-                endpoint=request.url.path,
-                status_code=500,
-                duration=duration
-            )
-            await monitoring_service.log_error("request_error", str(e), {
+            await monitoring_service.log_conversation_event({
+                "event": "http_request",
+                "method": request.method,
+                "endpoint": request.url.path,
+                "status_code": 500,
+                "duration": duration
+            })
+            await monitoring_service.log_error_event("request_error", str(e), {
                 "method": request.method,
                 "path": request.url.path,
                 "duration": duration
@@ -203,7 +205,7 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
         
         # Validate webhook structure
         if "entry" not in body:
-            await monitoring_service.log_error("webhook_validation", "Missing entry field", {"body_keys": list(body.keys())})
+            await monitoring_service.log_error_event("webhook_validation", "Missing entry field", {"body_keys": list(body.keys())})
             return {"status": "invalid_webhook"}
         
         entry = body.get("entry", [])[0]
@@ -246,22 +248,25 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
                 response_text = getattr(final_response, "content", "")
                 processing_time = time.time() - start_time
                 
-                # Record successful operation
-                await monitoring_service.record_agent_operation(
-                    "root_agent", "whatsapp_message", "success", processing_time
-                )
+                # Log successful operation
+                await monitoring_service.log_conversation_event({
+                    "event": "whatsapp_message_processed",
+                    "user_id": user_id,
+                    "processing_time": processing_time,
+                    "status": "success"
+                })
                 
                 logger.info(f"Processed message with modular system in {processing_time:.2f}s")
                 return JSONResponse({"reply": response_text})
             else:
-                await monitoring_service.log_error("agent_response", "No final response from agent", {
+                await monitoring_service.log_error_event("agent_response", "No final response from agent", {
                     "user_id": user_id,
                     "message_id": message_id
                 })
                 return {"status": "processed", "warning": "no_final_response"}
                 
         except asyncio.TimeoutError:
-            await monitoring_service.log_error("timeout", "Agent processing timeout", {
+            await monitoring_service.log_error_event("timeout", "Agent processing timeout", {
                 "user_id": user_id,
                 "timeout": settings.REQUEST_TIMEOUT_SECONDS
             })
@@ -272,7 +277,7 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
             
     except Exception as e:
         processing_time = time.time() - start_time
-        await monitoring_service.log_error("webhook_error", str(e), {
+        await monitoring_service.log_error_event("webhook_error", str(e), {
             "processing_time": processing_time,
             "user_id": locals().get("user_id"),
             "message_id": locals().get("message_id")
@@ -329,9 +334,10 @@ async def health_check():
         
         # Check monitoring service
         try:
-            summary = await monitoring_service.get_metrics_summary()
+            summary = await monitoring_service.get_system_health_summary()
             health_status["services"]["monitoring"] = "healthy"
-            health_status["metrics"].update(summary.get("system", {}))
+            if isinstance(summary, dict):
+                health_status["metrics"].update(summary)
         except Exception as e:
             health_status["services"]["monitoring"] = "unhealthy"
             health_status["status"] = "degraded"
@@ -341,9 +347,12 @@ async def health_check():
         if not root_agent:
             health_status["status"] = "degraded"
         
-        # Update session count in monitoring
+        # Log session count
         if monitoring_service and "active_sessions" in health_status["metrics"]:
-            await monitoring_service.update_active_sessions(health_status["metrics"]["active_sessions"])
+            await monitoring_service.log_conversation_event({
+                "event": "session_count_update",
+                "active_sessions": health_status["metrics"]["active_sessions"]
+            })
         
         return health_status
         
@@ -358,13 +367,13 @@ async def readiness_check():
         raise HTTPException(status_code=503, detail="Service not ready")
     return {"status": "ready", "architecture": "modular"}
 
-@app.get("/metrics", response_class=PlainTextResponse)
+@app.get("/metrics")
 async def metrics():
-    """Prometheus metrics endpoint"""
+    """Basic metrics endpoint"""
     if not monitoring_service:
         raise HTTPException(status_code=503, detail="Monitoring service not available")
     
-    return monitoring_service.get_prometheus_metrics()
+    return await monitoring_service.get_system_health_summary()
 
 @app.get("/admin/metrics")
 async def admin_metrics():
@@ -372,7 +381,7 @@ async def admin_metrics():
     if not monitoring_service:
         raise HTTPException(status_code=503, detail="Monitoring service not available")
     
-    return await monitoring_service.get_metrics_summary()
+    return await monitoring_service.get_system_health_summary()
 
 @app.get("/system/info")
 async def system_info():
@@ -382,13 +391,13 @@ async def system_info():
         "version": "2.0.0",
         "components": {
             "mcp_servers": [
-                "auth_tools",
+                "user_identification_tools",
                 "playwright_tools", 
                 "browser_use_tools",
                 "whatsapp_tools"
             ],
             "core_agents": [
-                "auth_agent",
+                "user_identification_agent",
                 "language_agent",
                 "intent_agent", 
                 "help_agent"
@@ -420,7 +429,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
     
     if monitoring_service:
-        await monitoring_service.log_error("global_exception", str(exc), {
+        await monitoring_service.log_error_event("global_exception", str(exc), {
             "path": str(request.url.path),
             "method": request.method,
             "user_agent": request.headers.get("user-agent"),
@@ -441,7 +450,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     """Rate limit exception handler"""
     if monitoring_service:
-        await monitoring_service.log_error("rate_limit_exceeded", str(exc), {
+        await monitoring_service.log_error_event("rate_limit_exceeded", str(exc), {
             "path": str(request.url.path),
             "remote_addr": get_remote_address(request)
         })

@@ -66,21 +66,57 @@ async def get_dashboard_stats(token: str = Depends(verify_admin_token)):
         # Get error summary
         error_summary = await supabase_client.get_recent_error_summary(24)
         
-        # Get popular services (mock data for now)
-        popular_services = [
-            {"service": "nira", "requests": 150, "success_rate": 0.95},
-            {"service": "ura", "requests": 120, "success_rate": 0.92},
-            {"service": "nssf", "requests": 80, "success_rate": 0.98},
-            {"service": "nlis", "requests": 45, "success_rate": 0.89}
-        ]
+        # Get popular services from actual monitoring data
+        try:
+            metrics_summary = await monitoring_service.get_metrics_summary()
+            service_metrics = metrics_summary.get("services", {})
+            
+            popular_services = []
+            for service, data in service_metrics.items():
+                if isinstance(data, dict):
+                    popular_services.append({
+                        "service": service,
+                        "requests": data.get("requests", 0),
+                        "success_rate": data.get("success_rate", 0.0)
+                    })
+                else:
+                    popular_services.append({
+                        "service": service,
+                        "requests": data if isinstance(data, int) else 0,
+                        "success_rate": 0.0
+                    })
+            
+            # Sort by requests count
+            popular_services.sort(key=lambda x: x["requests"], reverse=True)
+            
+            # If no data available, show empty state
+            if not popular_services:
+                popular_services = [
+                    {"service": "no_data", "requests": 0, "success_rate": 0.0}
+                ]
+                
+        except Exception as e:
+            logger.error(f"Failed to get service metrics: {e}")
+            popular_services = [
+                {"service": "error_loading", "requests": 0, "success_rate": 0.0}
+            ]
         
-        # Get language distribution (mock data for now)
-        language_distribution = {
-            "en": 45,
-            "lg": 30,
-            "luo": 15,
-            "nyn": 10
-        }
+        # Get language distribution from actual usage data
+        try:
+            language_metrics = metrics_summary.get("languages", {})
+            
+            # Convert to expected format
+            language_distribution = {}
+            for lang, count in language_metrics.items():
+                language_distribution[lang] = count if isinstance(count, int) else 0
+            
+            # If no data available, show empty state
+            if not language_distribution:
+                language_distribution = {"no_data": 0}
+                
+        except Exception as e:
+            logger.error(f"Failed to get language metrics: {e}")
+            language_distribution = {"error_loading": 0}
         
         return DashboardStats(
             active_sessions=active_sessions,

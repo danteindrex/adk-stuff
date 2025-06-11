@@ -103,21 +103,26 @@ class MonitoringService:
             }
             
         except ImportError:
-            # psutil not available, return mock data
+            # psutil not available, return error state
             return {
                 'name': 'memory_usage_percent',
-                'value': 45.0,  # Mock value
-                'metadata': {'mock': True}
+                'value': 0.0,
+                'metadata': {'error': 'psutil not available', 'status': 'unavailable'}
             }
         except Exception as e:
             logger.error(f"Failed to get memory usage metric: {e}")
             return None
     
     async def _get_active_sessions_metric(self) -> Optional[Dict[str, Any]]:
-        """Get active sessions metric (mock implementation)"""
+        """Get active sessions metric"""
         try:
-            # This would be replaced with actual session count from session manager
-            active_sessions = len(self.performance_buffer)  # Mock value
+            # Get actual session count from session manager if available
+            from main import session_manager
+            if session_manager:
+                stats = await session_manager.get_session_stats()
+                active_sessions = stats.get("total_active_sessions", 0)
+            else:
+                active_sessions = 0
             
             return {
                 'name': 'active_sessions',

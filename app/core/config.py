@@ -21,13 +21,17 @@ class Settings(BaseSettings):
     WHATSAPP_WEBHOOK_VERIFY_TOKEN: str = Field(..., env="WHATSAPP_WEBHOOK_VERIFY_TOKEN")
     WHATSAPP_BUSINESS_ACCOUNT_ID: str = Field(..., env="WHATSAPP_BUSINESS_ACCOUNT_ID")
     
-    # Google Cloud Authentication
-    GOOGLE_OAUTH_CLIENT_ID: str = Field(..., env="GOOGLE_OAUTH_CLIENT_ID")
-    GOOGLE_OAUTH_CLIENT_SECRET: str = Field(..., env="GOOGLE_OAUTH_CLIENT_SECRET")
-    FIREBASE_PROJECT_ID: str = Field(..., env="FIREBASE_PROJECT_ID")
+    # Firebase Configuration (for FAQ caching)
+    FIREBASE_PROJECT_ID: Optional[str] = Field(None, env="FIREBASE_PROJECT_ID")
+    FIREBASE_PRIVATE_KEY_ID: Optional[str] = Field(None, env="FIREBASE_PRIVATE_KEY_ID")
+    FIREBASE_PRIVATE_KEY: Optional[str] = Field(None, env="FIREBASE_PRIVATE_KEY")
+    FIREBASE_CLIENT_EMAIL: Optional[str] = Field(None, env="FIREBASE_CLIENT_EMAIL")
+    FIREBASE_CLIENT_ID: Optional[str] = Field(None, env="FIREBASE_CLIENT_ID")
+    FIREBASE_AUTH_URI: str = Field(default="https://accounts.google.com/o/oauth2/auth", env="FIREBASE_AUTH_URI")
+    FIREBASE_TOKEN_URI: str = Field(default="https://oauth2.googleapis.com/token", env="FIREBASE_TOKEN_URI")
     
-    # Google Cloud
-    GOOGLE_CLOUD_PROJECT: str = Field(..., env="GOOGLE_CLOUD_PROJECT")
+    # Google Cloud (Optional - only needed for advanced features)
+    GOOGLE_CLOUD_PROJECT: Optional[str] = Field(None, env="GOOGLE_CLOUD_PROJECT")
     GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = Field(None, env="GOOGLE_APPLICATION_CREDENTIALS")
     
     # Security
@@ -68,6 +72,12 @@ class Settings(BaseSettings):
         default=["nira", "ura", "nssf", "nlis"],
         env="GOVERNMENT_SERVICES"
     )
+    
+    # FAQ Cache Configuration
+    FAQ_CACHE_ENABLED: bool = Field(default=True, env="FAQ_CACHE_ENABLED")
+    FAQ_CACHE_TTL_HOURS: int = Field(default=24, env="FAQ_CACHE_TTL_HOURS")
+    FAQ_SIMILARITY_THRESHOLD: float = Field(default=0.8, env="FAQ_SIMILARITY_THRESHOLD")
+    FAQ_MAX_CACHE_SIZE: int = Field(default=1000, env="FAQ_MAX_CACHE_SIZE")
     
     @property
     def mcp_server_list(self) -> List[str]:
