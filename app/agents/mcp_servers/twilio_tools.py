@@ -7,7 +7,7 @@ import os
 import logging
 import json
 from typing import Dict, Any, List, Optional
-from google.adk.function_tool import FunctionTool
+from google.adk.tools import FunctionTool
 
 logger = logging.getLogger(__name__)
 

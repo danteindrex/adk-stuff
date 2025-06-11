@@ -1,9 +1,9 @@
 """
 MCP Servers for Uganda E-Gov WhatsApp Helpdesk
 """
-
+from .twilio_tools import get_twilio_tools
 from .auth_tools import get_auth_tools
-from .browser_tools import get_browser_tools
+from .browser_use_tools import get_browser_tools
 from .playwright_tools import get_playwright_tools
 from .twilio_tools import get_twilio_tools  # Add this line
 

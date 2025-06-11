@@ -46,10 +46,10 @@ async def create_auth_agent():
                 
                 # Uganda phone number patterns
                 valid_patterns = [
-                    r'^\+256[0-9]{9},  # +256XXXXXXXXX
-                    r'^256[0-9]{9},    # 256XXXXXXXXX
-                    r'^0[0-9]{9},      # 0XXXXXXXXX
-                    r'^[0-9]{9}        # XXXXXXXXX
+                    r'^\+256[0-9]{9}',  # +256XXXXXXXXX
+                    r'^256[0-9]{9}',    # 256XXXXXXXXX
+                    r'^0[0-9]{9}',      # 0XXXXXXXXX
+                    r'^[0-9]{9} '       # XXXXXXXXX
                 ]
                 
                 import re

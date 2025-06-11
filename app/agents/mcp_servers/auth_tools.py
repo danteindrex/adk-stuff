@@ -1,3 +1,6 @@
+print("Loaded auth_tools from:", __file__)
+
+
 """
 User Identification Tools
 Simple phone-based user identification for WhatsApp users
@@ -9,7 +12,7 @@ from google.adk.tools import FunctionTool
 
 logger = logging.getLogger(__name__)
 
-async def get_google_auth_tools():
+async def get_auth_tools():
     """Get user identification tools (renamed for compatibility)"""
     
     def identify_user_by_phone(phone_number: str, tool_context=None) -> dict:
@@ -45,10 +48,10 @@ async def get_google_auth_tools():
             
             # Uganda phone number patterns
             valid_patterns = [
-                r'^\+256[0-9]{9},  # +256XXXXXXXXX
-                r'^256[0-9]{9},    # 256XXXXXXXXX
-                r'^0[0-9]{9},      # 0XXXXXXXXX
-                r'^[0-9]{9}        # XXXXXXXXX
+                r'^\+256[0-9]{9}',  # +256XXXXXXXXX
+                r'^256[0-9]{9}',    # 256XXXXXXXXX
+                r'^0[0-9]{9}',      # 0XXXXXXXXX
+                r'^[0-9]{9} '      # XXXXXXXXX
             ]
             
             is_valid = any(re.match(pattern, clean_phone) for pattern in valid_patterns)

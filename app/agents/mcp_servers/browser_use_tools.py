@@ -11,7 +11,7 @@ from google.adk.tools import FunctionTool
 
 logger = logging.getLogger(__name__)
 
-async def get_browser_use_tools():
+async def get_browser_tools():
     """Get Browser-Use agent tools for AI-powered browser automation"""
     
     def browser_use_automation(
