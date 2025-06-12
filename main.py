@@ -193,6 +193,10 @@ async def monitor_requests(request: Request, call_next):
 # Include routers
 app.include_router(admin_router, prefix="/admin", tags=["Admin"])
 
+# Add static file serving for admin dashboard
+from fastapi.staticfiles import StaticFiles
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # Production-optimized WhatsApp webhook endpoint with enhanced automation
 # Update imports
 from app.services.twilio_client import TwilioClient
@@ -475,7 +479,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=int(os.getenv("PORT", 8080)),
+        port=int(os.getenv("PORT_NO", 8080)),
         reload=settings.ENVIRONMENT == "development",
         log_level=settings.LOG_LEVEL.lower(),
         workers=1 if settings.ENVIRONMENT == "development" else 4,

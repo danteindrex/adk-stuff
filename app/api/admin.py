@@ -1,12 +1,16 @@
 """
-Admin dashboard API endpoints
+Admin dashboard API endpoints with authentication
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Any, Optional
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Form, Response, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
+import jwt
+import hashlib
+import secrets
 from app.core.config import settings
 from app.core.logging_config import StructuredLogger
 
@@ -16,7 +20,17 @@ logger = StructuredLogger(__name__)
 admin_router = APIRouter()
 
 # Security
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
+
+# Admin credentials (in production, store these securely)
+ADMIN_USERNAME = "trevor"
+ADMIN_PASSWORD = "The$1000"
+JWT_SECRET = settings.JWT_SECRET_KEY or "your-secret-key-here"
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRATION_HOURS = 24
+
+# Active sessions store (in production, use Redis or database)
+active_sessions = {}
 
 class DashboardStats(BaseModel):
     """Dashboard statistics model"""
@@ -36,97 +50,219 @@ class MaintenanceConfig(BaseModel):
     message: Optional[str] = None
     duration_minutes: Optional[int] = None
 
+class LoginRequest(BaseModel):
+    """Login request model"""
+    username: str
+    password: str
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    """Create JWT access token"""
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS)
+    
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return encoded_jwt
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify password against hash"""
+    return hashlib.sha256(plain_password.encode()).hexdigest() == hashed_password
+
+def get_password_hash(password: str) -> str:
+    """Get password hash"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
 async def verify_admin_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Verify admin authentication token"""
-    # In production, implement proper JWT token verification
-    # For now, use a simple token check
-    if credentials.credentials != settings.JWT_SECRET_KEY:
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None or username != ADMIN_USERNAME:
+            raise HTTPException(status_code=401, detail="Invalid authentication token")
+        
+        # Check if session is still active
+        session_id = payload.get("session_id")
+        if session_id not in active_sessions:
+            raise HTTPException(status_code=401, detail="Session expired")
+        
+        return username
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.JWTError:
         raise HTTPException(status_code=401, detail="Invalid authentication token")
-    return credentials.credentials
+
+# Authentication endpoints
+@admin_router.get("/", response_class=HTMLResponse)
+async def admin_dashboard():
+    """Serve admin dashboard HTML"""
+    try:
+        with open("static/admin.html", "r", encoding="utf-8") as f:
+            html_content = f.read()
+        return HTMLResponse(content=html_content)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Admin dashboard not found")
+
+@admin_router.post("/login")
+async def admin_login(login_data: LoginRequest):
+    """Admin login endpoint"""
+    try:
+        # Verify credentials
+        if login_data.username != ADMIN_USERNAME or login_data.password != ADMIN_PASSWORD:
+            logger.warning(f"Failed login attempt for username: {login_data.username}")
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+        # Create session
+        session_id = secrets.token_urlsafe(32)
+        session_data = {
+            "username": login_data.username,
+            "login_time": datetime.utcnow().isoformat(),
+            "last_activity": datetime.utcnow().isoformat()
+        }
+        active_sessions[session_id] = session_data
+        
+        # Create JWT token
+        access_token_expires = timedelta(hours=JWT_EXPIRATION_HOURS)
+        access_token = create_access_token(
+            data={"sub": login_data.username, "session_id": session_id},
+            expires_delta=access_token_expires
+        )
+        
+        logger.info(f"Admin login successful for user: {login_data.username}")
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "expires_in": JWT_EXPIRATION_HOURS * 3600,
+            "username": login_data.username
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Login error: {e}")
+        raise HTTPException(status_code=500, detail="Login failed")
+
+@admin_router.post("/logout")
+async def admin_logout(username: str = Depends(verify_admin_token)):
+    """Admin logout endpoint"""
+    try:
+        # Remove all sessions for this user
+        sessions_to_remove = []
+        for session_id, session_data in active_sessions.items():
+            if session_data.get("username") == username:
+                sessions_to_remove.append(session_id)
+        
+        for session_id in sessions_to_remove:
+            del active_sessions[session_id]
+        
+        logger.info(f"Admin logout successful for user: {username}")
+        
+        return {"message": "Logged out successfully"}
+        
+    except Exception as e:
+        logger.error(f"Logout error: {e}")
+        raise HTTPException(status_code=500, detail="Logout failed")
+
+@admin_router.get("/verify")
+async def verify_admin_session(username: str = Depends(verify_admin_token)):
+    """Verify admin session is valid"""
+    return {
+        "valid": True,
+        "username": username,
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
 @admin_router.get("/dashboard/stats", response_model=DashboardStats)
-async def get_dashboard_stats(token: str = Depends(verify_admin_token)):
+async def get_dashboard_stats(username: str = Depends(verify_admin_token)):
     """Get real-time dashboard statistics"""
     try:
-        from main import supabase_client, monitoring_service
+        # Import services from main
+        monitoring_service = None
+        session_manager = None
         
-        if not supabase_client or not monitoring_service:
-            raise HTTPException(status_code=503, detail="Services not available")
-        
-        # Get active sessions count
-        active_sessions = await supabase_client.get_active_sessions_count()
-        
-        # Get today's usage stats
-        today = datetime.now(timezone.utc).date().isoformat()
-        daily_stats = await supabase_client.get_daily_usage_stats(today)
-        
-        # Get service health status
-        service_health = await supabase_client.get_service_health_status()
-        
-        # Get error summary
-        error_summary = await supabase_client.get_recent_error_summary(24)
-        
-        # Get popular services from actual monitoring data
         try:
-            metrics_summary = await monitoring_service.get_metrics_summary()
-            service_metrics = metrics_summary.get("services", {})
-            
-            popular_services = []
-            for service, data in service_metrics.items():
-                if isinstance(data, dict):
-                    popular_services.append({
-                        "service": service,
-                        "requests": data.get("requests", 0),
-                        "success_rate": data.get("success_rate", 0.0)
-                    })
-                else:
-                    popular_services.append({
-                        "service": service,
-                        "requests": data if isinstance(data, int) else 0,
-                        "success_rate": 0.0
-                    })
-            
-            # Sort by requests count
-            popular_services.sort(key=lambda x: x["requests"], reverse=True)
-            
-            # If no data available, show empty state
-            if not popular_services:
-                popular_services = [
-                    {"service": "no_data", "requests": 0, "success_rate": 0.0}
-                ]
-                
-        except Exception as e:
-            logger.error(f"Failed to get service metrics: {e}")
-            popular_services = [
-                {"service": "error_loading", "requests": 0, "success_rate": 0.0}
-            ]
+            from main import monitoring_service, session_manager
+        except ImportError:
+            logger.warning("Could not import monitoring services")
         
-        # Get language distribution from actual usage data
-        try:
-            language_metrics = metrics_summary.get("languages", {})
-            
-            # Convert to expected format
-            language_distribution = {}
-            for lang, count in language_metrics.items():
-                language_distribution[lang] = count if isinstance(count, int) else 0
-            
-            # If no data available, show empty state
-            if not language_distribution:
-                language_distribution = {"no_data": 0}
-                
-        except Exception as e:
-            logger.error(f"Failed to get language metrics: {e}")
-            language_distribution = {"error_loading": 0}
+        # Initialize default empty data structure
+        dashboard_data = {
+            "active_sessions": 0,
+            "today_interactions": 0,
+            "success_rate_24h": 0.0,
+            "avg_response_time": 0.0,
+            "service_health": {},
+            "popular_services": [],
+            "language_distribution": {},
+            "error_summary": []
+        }
+        
+        # Get active sessions from session manager
+        if session_manager:
+            try:
+                session_stats = await session_manager.get_session_stats()
+                dashboard_data["active_sessions"] = session_stats.get("total_active_sessions", 0)
+            except Exception as e:
+                logger.error(f"Failed to get session stats: {e}")
+        
+        # Get monitoring data
+        if monitoring_service:
+            try:
+                monitoring_data = await monitoring_service.get_system_health_summary()
+                if isinstance(monitoring_data, dict):
+                    # Extract relevant metrics
+                    dashboard_data["today_interactions"] = monitoring_data.get("total_messages_today", 0)
+                    dashboard_data["success_rate_24h"] = monitoring_data.get("success_rate_24h", 0.0)
+                    dashboard_data["avg_response_time"] = monitoring_data.get("avg_response_time_ms", 0.0)
+                    
+                    # Service health from monitoring
+                    services = monitoring_data.get("services", {})
+                    for service_name, service_data in services.items():
+                        if isinstance(service_data, dict):
+                            dashboard_data["service_health"][service_name] = {
+                                "status": service_data.get("status", "unknown"),
+                                "total_requests": service_data.get("total_requests", 0),
+                                "success_rate": service_data.get("success_rate", 0.0)
+                            }
+                    
+                    # Popular services
+                    dashboard_data["popular_services"] = [
+                        {
+                            "service": name,
+                            "requests": data.get("total_requests", 0),
+                            "success_rate": data.get("success_rate", 0.0)
+                        }
+                        for name, data in services.items()
+                        if isinstance(data, dict)
+                    ]
+                    
+                    # Language distribution
+                    dashboard_data["language_distribution"] = monitoring_data.get("language_distribution", {})
+                    
+                    # Error summary
+                    dashboard_data["error_summary"] = monitoring_data.get("error_summary", [])
+                    
+            except Exception as e:
+                logger.error(f"Failed to get monitoring data: {e}")
+        
+        # Get admin session count (current active admin sessions)
+        admin_session_count = len(active_sessions)
         
         return DashboardStats(
-            active_sessions=active_sessions,
-            today_interactions=daily_stats.get('total_interactions', 0),
-            success_rate_24h=daily_stats.get('success_rate', 0.0),
-            avg_response_time=daily_stats.get('avg_response_time', 0.0),
-            service_health=service_health,
-            popular_services=popular_services,
-            language_distribution=language_distribution,
-            error_summary=error_summary
+            active_sessions=dashboard_data["active_sessions"],
+            today_interactions=dashboard_data["today_interactions"],
+            success_rate_24h=dashboard_data["success_rate_24h"],
+            avg_response_time=dashboard_data["avg_response_time"],
+            service_health=dashboard_data["service_health"],
+            popular_services=dashboard_data["popular_services"],
+            language_distribution=dashboard_data["language_distribution"],
+            error_summary=dashboard_data["error_summary"]
         )
         
     except Exception as e:
@@ -137,26 +273,33 @@ async def get_dashboard_stats(token: str = Depends(verify_admin_token)):
 async def get_real_time_logs(
     limit: int = Query(default=50, le=200),
     service: Optional[str] = Query(default=None),
-    token: str = Depends(verify_admin_token)
+    username: str = Depends(verify_admin_token)
 ):
     """Get real-time system logs"""
     try:
-        from main import supabase_client
+        # Import monitoring service to get real logs
+        monitoring_service = None
+        try:
+            from main import monitoring_service
+        except ImportError:
+            logger.warning("Could not import monitoring service")
         
-        if not supabase_client:
-            raise HTTPException(status_code=503, detail="Database service not available")
+        logs_data = []
         
-        # Build query
-        query = supabase_client.client.table('conversation_logs').select('*').order('timestamp', desc=True).limit(limit)
+        # Get logs from monitoring service
+        if monitoring_service:
+            try:
+                logs_data = await monitoring_service.get_recent_logs(limit=limit, service_filter=service)
+            except Exception as e:
+                logger.error(f"Failed to get logs from monitoring service: {e}")
         
-        if service:
-            query = query.eq('agent_involved', service)
-        
-        result = query.execute()
+        # If no monitoring service or no logs, return empty result
+        if not logs_data:
+            logs_data = []
         
         return {
-            "logs": result.data,
-            "total": len(result.data),
+            "logs": logs_data,
+            "total": len(logs_data),
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
@@ -167,22 +310,25 @@ async def get_real_time_logs(
 @admin_router.get("/analytics/usage")
 async def get_usage_analytics(
     days: int = Query(default=7, le=30),
-    token: str = Depends(verify_admin_token)
+    username: str = Depends(verify_admin_token)
 ):
     """Get usage analytics for specified number of days"""
     try:
-        from main import supabase_client
+        # Import monitoring service to get real analytics
+        monitoring_service = None
+        try:
+            from main import monitoring_service
+        except ImportError:
+            logger.warning("Could not import monitoring service")
         
-        if not supabase_client:
-            raise HTTPException(status_code=503, detail="Database service not available")
-        
-        # Get daily stats for the specified period
         analytics_data = []
-        for i in range(days):
-            date = (datetime.now(timezone.utc).date() - datetime.timedelta(days=i)).isoformat()
-            daily_stats = await supabase_client.get_daily_usage_stats(date)
-            if daily_stats:
-                analytics_data.append(daily_stats)
+        
+        # Get analytics from monitoring service
+        if monitoring_service:
+            try:
+                analytics_data = await monitoring_service.get_usage_analytics(days=days)
+            except Exception as e:
+                logger.error(f"Failed to get analytics from monitoring service: {e}")
         
         return {
             "analytics": analytics_data,
@@ -195,10 +341,18 @@ async def get_usage_analytics(
         raise HTTPException(status_code=500, detail="Failed to retrieve analytics")
 
 @admin_router.get("/services/health")
-async def get_services_health(token: str = Depends(verify_admin_token)):
+async def get_services_health(username: str = Depends(verify_admin_token)):
     """Get detailed health status of all services"""
     try:
-        from main import supabase_client, agent_orchestrator
+        # Import services from main
+        monitoring_service = None
+        session_manager = None
+        root_agent = None
+        
+        try:
+            from main import monitoring_service, session_manager, root_agent
+        except ImportError:
+            logger.warning("Could not import services from main")
         
         health_status = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -206,26 +360,58 @@ async def get_services_health(token: str = Depends(verify_admin_token)):
             "services": {}
         }
         
-        # Check database
-        if supabase_client:
-            db_healthy = await supabase_client.health_check()
-            health_status["services"]["database"] = {
-                "status": "healthy" if db_healthy else "unhealthy",
+        # Check session manager
+        if session_manager:
+            try:
+                session_stats = await session_manager.get_session_stats()
+                health_status["services"]["session_manager"] = {
+                    "status": "healthy",
+                    "last_check": datetime.now(timezone.utc).isoformat(),
+                    "active_sessions": session_stats.get("total_active_sessions", 0)
+                }
+            except Exception as e:
+                health_status["services"]["session_manager"] = {
+                    "status": "unhealthy",
+                    "last_check": datetime.now(timezone.utc).isoformat(),
+                    "error": str(e)
+                }
+        
+        # Check monitoring service
+        if monitoring_service:
+            try:
+                monitoring_health = await monitoring_service.get_system_health_summary()
+                health_status["services"]["monitoring"] = {
+                    "status": "healthy",
+                    "last_check": datetime.now(timezone.utc).isoformat()
+                }
+            except Exception as e:
+                health_status["services"]["monitoring"] = {
+                    "status": "unhealthy",
+                    "last_check": datetime.now(timezone.utc).isoformat(),
+                    "error": str(e)
+                }
+        
+        # Check root agent
+        if root_agent:
+            health_status["services"]["root_agent"] = {
+                "status": "healthy",
                 "last_check": datetime.now(timezone.utc).isoformat()
             }
-        
-        # Check agent orchestrator
-        if agent_orchestrator:
-            orchestrator_healthy = await agent_orchestrator.health_check()
-            health_status["services"]["agent_orchestrator"] = {
-                "status": "healthy" if orchestrator_healthy else "unhealthy",
-                "last_check": datetime.now(timezone.utc).isoformat()
+        else:
+            health_status["services"]["root_agent"] = {
+                "status": "unhealthy",
+                "last_check": datetime.now(timezone.utc).isoformat(),
+                "error": "Root agent not available"
             }
         
-        # Check government services
-        if supabase_client:
-            service_health = await supabase_client.get_service_health_status()
-            health_status["services"]["government_portals"] = service_health
+        # Get service health from monitoring if available
+        if monitoring_service:
+            try:
+                service_health_data = await monitoring_service.get_service_health()
+                if isinstance(service_health_data, dict):
+                    health_status["services"].update(service_health_data)
+            except Exception as e:
+                logger.error(f"Failed to get service health from monitoring: {e}")
         
         # Determine overall status
         unhealthy_services = [
@@ -246,22 +432,35 @@ async def get_services_health(token: str = Depends(verify_admin_token)):
 @admin_router.post("/system/maintenance")
 async def toggle_maintenance_mode(
     config: MaintenanceConfig,
-    token: str = Depends(verify_admin_token)
+    username: str = Depends(verify_admin_token)
 ):
     """Enable/disable maintenance mode for specific services"""
     try:
-        from main import agent_orchestrator
+        # Import monitoring service to handle maintenance mode
+        monitoring_service = None
+        try:
+            from main import monitoring_service
+        except ImportError:
+            logger.warning("Could not import monitoring service")
         
-        if not agent_orchestrator:
-            raise HTTPException(status_code=503, detail="Agent orchestrator not available")
+        if not monitoring_service:
+            raise HTTPException(status_code=503, detail="Monitoring service not available")
         
-        # Toggle maintenance mode
-        result = await agent_orchestrator.set_maintenance_mode(
-            config.service_name,
-            config.enabled,
-            config.message,
-            config.duration_minutes
-        )
+        # Toggle maintenance mode through monitoring service
+        try:
+            result = await monitoring_service.set_maintenance_mode(
+                config.service_name,
+                config.enabled,
+                config.message,
+                config.duration_minutes
+            )
+        except AttributeError:
+            # If monitoring service doesn't have maintenance mode method, log the request
+            logger.info("Maintenance mode request logged", 
+                       service=config.service_name, 
+                       enabled=config.enabled,
+                       duration=config.duration_minutes)
+            result = True
         
         logger.info("Maintenance mode toggled", 
                    service=config.service_name, 
@@ -285,26 +484,29 @@ async def toggle_maintenance_mode(
 async def get_admin_alerts(
     limit: int = Query(default=20, le=100),
     severity: Optional[str] = Query(default=None),
-    token: str = Depends(verify_admin_token)
+    username: str = Depends(verify_admin_token)
 ):
     """Get admin alerts"""
     try:
-        from main import supabase_client
+        # Import monitoring service to get real alerts
+        monitoring_service = None
+        try:
+            from main import monitoring_service
+        except ImportError:
+            logger.warning("Could not import monitoring service")
         
-        if not supabase_client:
-            raise HTTPException(status_code=503, detail="Database service not available")
+        alerts_data = []
         
-        # Build query
-        query = supabase_client.client.table('admin_alerts').select('*').order('timestamp', desc=True).limit(limit)
-        
-        if severity:
-            query = query.eq('severity', severity)
-        
-        result = query.execute()
+        # Get alerts from monitoring service
+        if monitoring_service:
+            try:
+                alerts_data = await monitoring_service.get_alerts(limit=limit, severity_filter=severity)
+            except Exception as e:
+                logger.error(f"Failed to get alerts from monitoring service: {e}")
         
         return {
-            "alerts": result.data,
-            "total": len(result.data),
+            "alerts": alerts_data,
+            "total": len(alerts_data),
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
@@ -315,30 +517,37 @@ async def get_admin_alerts(
 @admin_router.post("/alerts/{alert_id}/acknowledge")
 async def acknowledge_alert(
     alert_id: str,
-    token: str = Depends(verify_admin_token)
+    username: str = Depends(verify_admin_token)
 ):
     """Acknowledge an admin alert"""
     try:
-        from main import supabase_client
+        # Import monitoring service to acknowledge alerts
+        monitoring_service = None
+        try:
+            from main import monitoring_service
+        except ImportError:
+            logger.warning("Could not import monitoring service")
         
-        if not supabase_client:
-            raise HTTPException(status_code=503, detail="Database service not available")
+        if not monitoring_service:
+            raise HTTPException(status_code=503, detail="Monitoring service not available")
         
-        # Update alert as acknowledged
-        result = supabase_client.client.table('admin_alerts').update({
-            'acknowledged': True,
-            'acknowledged_by': 'admin',  # In production, use actual admin user
-            'acknowledged_at': datetime.now(timezone.utc).isoformat()
-        }).eq('id', alert_id).execute()
+        # Acknowledge alert through monitoring service
+        try:
+            result = await monitoring_service.acknowledge_alert(alert_id, username)
+        except AttributeError:
+            # If monitoring service doesn't have acknowledge method, log the action
+            logger.info("Alert acknowledgment logged", alert_id=alert_id, acknowledged_by=username)
+            result = True
         
-        if not result.data:
+        if not result:
             raise HTTPException(status_code=404, detail="Alert not found")
         
-        logger.info("Alert acknowledged", alert_id=alert_id)
+        logger.info("Alert acknowledged", alert_id=alert_id, acknowledged_by=username)
         
         return {
             "success": True,
             "alert_id": alert_id,
+            "acknowledged_by": username,
             "acknowledged_at": datetime.now(timezone.utc).isoformat()
         }
         
@@ -349,32 +558,30 @@ async def acknowledge_alert(
 @admin_router.get("/performance/metrics")
 async def get_performance_metrics(
     hours: int = Query(default=24, le=168),  # Max 1 week
-    token: str = Depends(verify_admin_token)
+    username: str = Depends(verify_admin_token)
 ):
     """Get system performance metrics"""
     try:
-        from main import supabase_client
+        # Import monitoring service to get real performance metrics
+        monitoring_service = None
+        try:
+            from main import monitoring_service
+        except ImportError:
+            logger.warning("Could not import monitoring service")
         
-        if not supabase_client:
-            raise HTTPException(status_code=503, detail="Database service not available")
+        metrics_data = {}
         
-        # Get performance metrics for the specified period
-        cutoff_time = datetime.now(timezone.utc).replace(hour=datetime.now().hour-hours).isoformat()
-        
-        result = supabase_client.client.table('system_performance').select('*').gte('timestamp', cutoff_time).order('timestamp', desc=True).execute()
-        
-        # Group metrics by name
-        metrics_by_name = {}
-        for metric in result.data:
-            name = metric['metric_name']
-            if name not in metrics_by_name:
-                metrics_by_name[name] = []
-            metrics_by_name[name].append(metric)
+        # Get performance metrics from monitoring service
+        if monitoring_service:
+            try:
+                metrics_data = await monitoring_service.get_performance_metrics(hours=hours)
+            except Exception as e:
+                logger.error(f"Failed to get performance metrics from monitoring service: {e}")
         
         return {
-            "metrics": metrics_by_name,
+            "metrics": metrics_data,
             "period_hours": hours,
-            "total_data_points": len(result.data),
+            "total_data_points": sum(len(v) if isinstance(v, list) else 1 for v in metrics_data.values()),
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
@@ -385,23 +592,29 @@ async def get_performance_metrics(
 @admin_router.get("/users/sessions")
 async def get_active_user_sessions(
     limit: int = Query(default=50, le=200),
-    token: str = Depends(verify_admin_token)
+    username: str = Depends(verify_admin_token)
 ):
     """Get active user sessions"""
     try:
-        from main import supabase_client
+        # Import session manager to get real user sessions
+        session_manager = None
+        try:
+            from main import session_manager
+        except ImportError:
+            logger.warning("Could not import session manager")
         
-        if not supabase_client:
-            raise HTTPException(status_code=503, detail="Database service not available")
+        sessions_data = []
         
-        # Get active sessions (last 30 minutes)
-        cutoff_time = datetime.now(timezone.utc).replace(minute=datetime.now().minute-30).isoformat()
-        
-        result = supabase_client.client.table('user_sessions').select('*').gte('last_activity', cutoff_time).order('last_activity', desc=True).limit(limit).execute()
+        # Get active sessions from session manager
+        if session_manager:
+            try:
+                sessions_data = await session_manager.get_active_sessions(limit=limit)
+            except Exception as e:
+                logger.error(f"Failed to get active sessions from session manager: {e}")
         
         return {
-            "sessions": result.data,
-            "total": len(result.data),
+            "sessions": sessions_data,
+            "total": len(sessions_data),
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
         

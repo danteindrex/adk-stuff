@@ -11,6 +11,7 @@ python-dotenv
 cryptography
 python-jose[cryptography]
 passlib[bcrypt]
+PyJWT
 
 # Session management
 redis

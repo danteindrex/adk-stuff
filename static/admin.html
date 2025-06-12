@@ -18,21 +18,134 @@
             color: #333;
         }
 
+        /* Login Styles */
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .login-form {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-form h2 {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+
+        .login-btn {
+            width: 100%;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 0.75rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin-top: 1rem;
+        }
+
+        .login-btn:hover {
+            background: #5a6fd8;
+        }
+
+        .login-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 0.75rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        /* Dashboard Styles */
+        .dashboard {
+            display: none;
+        }
+
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 1rem 2rem;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        .header h1 {
+        .header-left h1 {
             font-size: 1.8rem;
             margin-bottom: 0.5rem;
         }
 
-        .header p {
+        .header-left p {
             opacity: 0.9;
             font-size: 0.9rem;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logout-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
         }
 
         .container {
@@ -238,139 +351,309 @@
             .services-grid {
                 grid-template-columns: 1fr;
             }
+
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🇺🇬 Uganda E-Gov WhatsApp Helpdesk</h1>
-        <p>Real-time Admin Dashboard - Multi-Agent AI System</p>
+    <!-- Login Form -->
+    <div id="login-container" class="login-container">
+        <form class="login-form" id="login-form">
+            <h2>🇺🇬 Admin Login</h2>
+            <div id="login-error"></div>
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit" class="login-btn" id="login-btn">Login</button>
+        </form>
     </div>
 
-    <div class="container">
-        <button class="refresh-btn" onclick="refreshDashboard()">🔄 Refresh Dashboard</button>
-
-        <div id="error-container"></div>
-
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3>Active Sessions</h3>
-                <div class="value" id="active-sessions">-</div>
-                <div class="change">Users currently online</div>
+    <!-- Dashboard -->
+    <div id="dashboard" class="dashboard">
+        <div class="header">
+            <div class="header-left">
+                <h1>🇺🇬 Uganda E-Gov WhatsApp Helpdesk</h1>
+                <p>Real-time Admin Dashboard - Multi-Agent AI System</p>
             </div>
-            <div class="stat-card">
-                <h3>Today's Interactions</h3>
-                <div class="value" id="today-interactions">-</div>
-                <div class="change">Messages processed today</div>
-            </div>
-            <div class="stat-card">
-                <h3>Success Rate (24h)</h3>
-                <div class="value" id="success-rate">-</div>
-                <div class="change">Successful completions</div>
-            </div>
-            <div class="stat-card">
-                <h3>Avg Response Time</h3>
-                <div class="value" id="response-time">-</div>
-                <div class="change">Milliseconds</div>
+            <div class="header-right">
+                <div class="user-info">
+                    <span>👤 <span id="username-display"></span></span>
+                </div>
+                <button class="logout-btn" onclick="logout()">Logout</button>
             </div>
         </div>
 
-        <div class="chart-container">
-            <h3>📊 Language Distribution</h3>
-            <canvas id="languageChart" width="400" height="200"></canvas>
-        </div>
+        <div class="container">
+            <button class="refresh-btn" onclick="refreshDashboard()">🔄 Refresh Dashboard</button>
 
-        <div class="services-grid">
-            <div class="service-card">
-                <h4>
-                    <span class="status-indicator status-healthy" id="nira-status"></span>
-                    🎫 NIRA (Birth Certificates)
-                </h4>
-                <div class="service-metrics">
-                    <div class="metric">
-                        <div class="label">Requests Today</div>
-                        <div class="value" id="nira-requests">-</div>
+            <div id="error-container"></div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Active Sessions</h3>
+                    <div class="value" id="active-sessions">-</div>
+                    <div class="change">Users currently online</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Today's Interactions</h3>
+                    <div class="value" id="today-interactions">-</div>
+                    <div class="change">Messages processed today</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Success Rate (24h)</h3>
+                    <div class="value" id="success-rate">-</div>
+                    <div class="change">Successful completions</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Avg Response Time</h3>
+                    <div class="value" id="response-time">-</div>
+                    <div class="change">Milliseconds</div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <h3>📊 Language Distribution</h3>
+                <canvas id="languageChart" width="400" height="200"></canvas>
+            </div>
+
+            <div class="services-grid">
+                <div class="service-card">
+                    <h4>
+                        <span class="status-indicator status-healthy" id="nira-status"></span>
+                        🎫 NIRA (Birth Certificates)
+                    </h4>
+                    <div class="service-metrics">
+                        <div class="metric">
+                            <div class="label">Requests Today</div>
+                            <div class="value" id="nira-requests">-</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Success Rate</div>
+                            <div class="value" id="nira-success">-</div>
+                        </div>
                     </div>
-                    <div class="metric">
-                        <div class="label">Success Rate</div>
-                        <div class="value" id="nira-success">-</div>
+                </div>
+
+                <div class="service-card">
+                    <h4>
+                        <span class="status-indicator status-healthy" id="ura-status"></span>
+                        💼 URA (Tax Services)
+                    </h4>
+                    <div class="service-metrics">
+                        <div class="metric">
+                            <div class="label">Requests Today</div>
+                            <div class="value" id="ura-requests">-</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Success Rate</div>
+                            <div class="value" id="ura-success">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="service-card">
+                    <h4>
+                        <span class="status-indicator status-healthy" id="nssf-status"></span>
+                        🏦 NSSF (Pension Services)
+                    </h4>
+                    <div class="service-metrics">
+                        <div class="metric">
+                            <div class="label">Requests Today</div>
+                            <div class="value" id="nssf-requests">-</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Success Rate</div>
+                            <div class="value" id="nssf-success">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="service-card">
+                    <h4>
+                        <span class="status-indicator status-healthy" id="nlis-status"></span>
+                        🌿 NLIS (Land Records)
+                    </h4>
+                    <div class="service-metrics">
+                        <div class="metric">
+                            <div class="label">Requests Today</div>
+                            <div class="value" id="nlis-requests">-</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Success Rate</div>
+                            <div class="value" id="nlis-success">-</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="service-card">
-                <h4>
-                    <span class="status-indicator status-healthy" id="ura-status"></span>
-                    💼 URA (Tax Services)
-                </h4>
-                <div class="service-metrics">
-                    <div class="metric">
-                        <div class="label">Requests Today</div>
-                        <div class="value" id="ura-requests">-</div>
-                    </div>
-                    <div class="metric">
-                        <div class="label">Success Rate</div>
-                        <div class="value" id="ura-success">-</div>
-                    </div>
+            <div class="logs-container">
+                <h3>📋 Recent System Logs</h3>
+                <div id="logs-content">
+                    <div class="loading">Loading recent logs...</div>
                 </div>
-            </div>
-
-            <div class="service-card">
-                <h4>
-                    <span class="status-indicator status-healthy" id="nssf-status"></span>
-                    🏦 NSSF (Pension Services)
-                </h4>
-                <div class="service-metrics">
-                    <div class="metric">
-                        <div class="label">Requests Today</div>
-                        <div class="value" id="nssf-requests">-</div>
-                    </div>
-                    <div class="metric">
-                        <div class="label">Success Rate</div>
-                        <div class="value" id="nssf-success">-</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="service-card">
-                <h4>
-                    <span class="status-indicator status-healthy" id="nlis-status"></span>
-                    🌿 NLIS (Land Records)
-                </h4>
-                <div class="service-metrics">
-                    <div class="metric">
-                        <div class="label">Requests Today</div>
-                        <div class="value" id="nlis-requests">-</div>
-                    </div>
-                    <div class="metric">
-                        <div class="label">Success Rate</div>
-                        <div class="value" id="nlis-success">-</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="logs-container">
-            <h3>📋 Recent System Logs</h3>
-            <div id="logs-content">
-                <div class="loading">Loading recent logs...</div>
             </div>
         </div>
     </div>
 
     <script>
-        // Dashboard configuration
+        // Authentication and Dashboard Management
         const API_BASE = window.location.origin;
         const REFRESH_INTERVAL = 30000; // 30 seconds
         let refreshTimer;
+        let authToken = null;
+        let currentUser = null;
 
-        // Initialize dashboard
+        // Initialize application
         document.addEventListener('DOMContentLoaded', function() {
-            refreshDashboard();
-            startAutoRefresh();
+            checkAuthStatus();
+            setupLoginForm();
         });
 
+        function setupLoginForm() {
+            const loginForm = document.getElementById('login-form');
+            loginForm.addEventListener('submit', handleLogin);
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            
+            const loginBtn = document.getElementById('login-btn');
+            const errorDiv = document.getElementById('login-error');
+            
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Logging in...';
+            errorDiv.innerHTML = '';
+            
+            const formData = new FormData(event.target);
+            const loginData = {
+                username: formData.get('username'),
+                password: formData.get('password')
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(loginData)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    authToken = data.access_token;
+                    currentUser = data.username;
+                    
+                    // Store token in localStorage
+                    localStorage.setItem('admin_token', authToken);
+                    localStorage.setItem('admin_user', currentUser);
+                    
+                    showDashboard();
+                } else {
+                    const error = await response.json();
+                    showLoginError(error.detail || 'Login failed');
+                }
+            } catch (error) {
+                showLoginError('Network error. Please try again.');
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Login';
+            }
+        }
+
+        function showLoginError(message) {
+            const errorDiv = document.getElementById('login-error');
+            errorDiv.innerHTML = `<div class="error-message">${message}</div>`;
+        }
+
+        function checkAuthStatus() {
+            const storedToken = localStorage.getItem('admin_token');
+            const storedUser = localStorage.getItem('admin_user');
+            
+            if (storedToken && storedUser) {
+                authToken = storedToken;
+                currentUser = storedUser;
+                verifyToken();
+            } else {
+                showLogin();
+            }
+        }
+
+        async function verifyToken() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/verify`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    showDashboard();
+                } else {
+                    clearAuth();
+                    showLogin();
+                }
+            } catch (error) {
+                clearAuth();
+                showLogin();
+            }
+        }
+
+        function showLogin() {
+            document.getElementById('login-container').style.display = 'flex';
+            document.getElementById('dashboard').style.display = 'none';
+        }
+
+        function showDashboard() {
+            document.getElementById('login-container').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+            document.getElementById('username-display').textContent = currentUser;
+            
+            refreshDashboard();
+            startAutoRefresh();
+        }
+
+        async function logout() {
+            try {
+                await fetch(`${API_BASE}/admin/logout`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+            } catch (error) {
+                console.error('Logout error:', error);
+            } finally {
+                clearAuth();
+                showLogin();
+                stopAutoRefresh();
+            }
+        }
+
+        function clearAuth() {
+            authToken = null;
+            currentUser = null;
+            localStorage.removeItem('admin_token');
+            localStorage.removeItem('admin_user');
+        }
+
+        // Dashboard functionality
         async function refreshDashboard() {
+            if (!authToken) {
+                showLogin();
+                return;
+            }
+
             try {
                 clearError();
                 await Promise.all([
@@ -378,37 +661,34 @@
                     loadRecentLogs()
                 ]);
             } catch (error) {
-                showError('Failed to refresh dashboard: ' + error.message);
+                if (error.message.includes('401')) {
+                    clearAuth();
+                    showLogin();
+                } else {
+                    showError('Failed to refresh dashboard: ' + error.message);
+                }
             }
         }
 
         async function loadDashboardStats() {
             try {
-                // For demo purposes, we'll use mock data
-                // In production, this would call: const response = await fetch(`${API_BASE}/admin/dashboard/stats`);
-                
-                const mockData = {
-                    active_sessions: 47,
-                    today_interactions: 1284,
-                    success_rate_24h: 0.956,
-                    avg_response_time: 2340,
-                    service_health: {
-                        nira: { status: 'healthy', total_requests: 342, success_rate: 0.95 },
-                        ura: { status: 'healthy', total_requests: 298, success_rate: 0.92 },
-                        nssf: { status: 'healthy', total_requests: 156, success_rate: 0.98 },
-                        nlis: { status: 'degraded', total_requests: 89, success_rate: 0.87 }
-                    },
-                    language_distribution: {
-                        en: 45,
-                        lg: 30,
-                        luo: 15,
-                        nyn: 10
+                const response = await fetch(`${API_BASE}/admin/dashboard/stats`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
                     }
-                };
+                });
 
-                updateDashboardStats(mockData);
-                updateServiceHealth(mockData.service_health);
-                updateLanguageChart(mockData.language_distribution);
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        throw new Error('401 Unauthorized');
+                    }
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                updateDashboardStats(data);
+                updateServiceHealth(data.service_health);
+                updateLanguageChart(data.language_distribution);
 
             } catch (error) {
                 console.error('Error loading dashboard stats:', error);
@@ -418,16 +698,21 @@
 
         async function loadRecentLogs() {
             try {
-                // Mock log data
-                const mockLogs = [
-                    { timestamp: new Date().toISOString(), level: 'info', message: 'User authenticated successfully', user_phone: '+256700000001' },
-                    { timestamp: new Date(Date.now() - 30000).toISOString(), level: 'info', message: 'Birth certificate lookup completed', service: 'nira' },
-                    { timestamp: new Date(Date.now() - 60000).toISOString(), level: 'warning', message: 'High response time detected', avg_time: '4500ms' },
-                    { timestamp: new Date(Date.now() - 90000).toISOString(), level: 'info', message: 'Tax status query processed', service: 'ura' },
-                    { timestamp: new Date(Date.now() - 120000).toISOString(), level: 'error', message: 'NLIS service timeout', service: 'nlis' }
-                ];
+                const response = await fetch(`${API_BASE}/admin/logs/real-time?limit=10`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
 
-                updateRecentLogs(mockLogs);
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        throw new Error('401 Unauthorized');
+                    }
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                updateRecentLogs(data.logs);
 
             } catch (error) {
                 console.error('Error loading recent logs:', error);
@@ -542,7 +827,7 @@
         document.addEventListener('visibilitychange', function() {
             if (document.hidden) {
                 stopAutoRefresh();
-            } else {
+            } else if (authToken) {
                 refreshDashboard();
                 startAutoRefresh();
             }

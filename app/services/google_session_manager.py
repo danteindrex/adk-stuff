@@ -5,7 +5,7 @@ Handles user sessions using Google Cloud services (Firestore, Identity Platform)
 
 import logging
 import asyncio
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 from datetime import datetime, timedelta
 import json
 import os
@@ -324,6 +324,25 @@ class GoogleSessionManager:
             "total_sessions_in_firestore": total_sessions,
             "session_timeout_minutes": self.session_timeout.total_seconds() / 60
         }
+    
+    async def get_active_sessions(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get list of active sessions"""
+        try:
+            # Get active sessions from memory
+            active_sessions_list = [
+                session for session in self.active_sessions.values()
+                if session["is_active"]
+            ]
+            
+            # Sort by last activity (most recent first)
+            active_sessions_list.sort(key=lambda x: x["last_activity"], reverse=True)
+            
+            # Apply limit
+            return active_sessions_list[:limit]
+            
+        except Exception as e:
+            logger.error(f"Failed to get active sessions: {e}")
+            return []
     
     async def start_cleanup_task(self):
         """Start background task to clean up expired sessions"""
