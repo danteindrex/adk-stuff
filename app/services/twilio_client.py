@@ -15,19 +15,30 @@ class TwilioClient:
         self.from_number = settings.TWILIO_WHATSAPP_NUMBER
         self.api_key_sid = settings.TWILIO_API_KEY_SID
         
-        # Initialize Twilio client
-        if self.api_key_sid:
-            # Use API Key authentication if available (more secure)
-            self.client = Client(self.api_key_sid, self.auth_token, self.account_sid)
-            logger.info("Twilio WhatsApp client initialized with API Key")
-        else:
-            # Fall back to Account SID + Auth Token
+        print(f"🔧 TWILIO CLIENT INITIALIZATION:")
+        print(f"   Account SID: {self.account_sid}")
+        print(f"   Auth Token: {'SET' if self.auth_token else 'NOT SET'}")
+        print(f"   WhatsApp Number: {self.from_number}")
+        print(f"   API Key SID: {self.api_key_sid}")
+        
+        # Initialize Twilio client - Use Account SID + Auth Token (standard method)
+        try:
             self.client = Client(self.account_sid, self.auth_token)
-            logger.info("Twilio WhatsApp client initialized")
+            print(f"   ✅ Twilio client initialized with Account SID + Auth Token")
+            logger.info("Twilio WhatsApp client initialized with Account SID + Auth Token")
+        except Exception as e:
+            print(f"   ❌ Twilio client initialization failed: {e}")
+            logger.error(f"Twilio client initialization failed: {e}")
+            raise
     
     async def send_text_message(self, to_number: str, message: str) -> dict:
         """Send a text message via Twilio WhatsApp"""
         try:
+            print(f"🔧 TWILIO CLIENT - SENDING MESSAGE:")
+            print(f"   To: {to_number}")
+            print(f"   From: {self.from_number}")
+            print(f"   Message length: {len(message)} chars")
+            
             # Format WhatsApp number if needed
             if not to_number.startswith('whatsapp:'):
                 to_number = f"whatsapp:{to_number}"
@@ -37,17 +48,42 @@ class TwilioClient:
             if not from_number.startswith('whatsapp:'):
                 from_number = f"whatsapp:{from_number}"
             
-            # Send message
-            message = self.client.messages.create(
-                body=message,
-                from_=from_number,
-                to=to_number
-            )
+            print(f"   Formatted To: {to_number}")
+            print(f"   Formatted From: {from_number}")
             
-            logger.info(f"Sent Twilio WhatsApp message to {to_number}, SID: {message.sid}")
-            return {"status": "success", "message_id": message.sid}
+            # Send message using Twilio client
+            print(f"   📞 Calling Twilio API...")
+            
+            # Run the synchronous Twilio call in a thread pool
+            import asyncio
+            loop = asyncio.get_event_loop()
+            
+            def send_message():
+                return self.client.messages.create(
+                    body=message,
+                    from_=from_number,
+                    to=to_number
+                )
+            
+            # Execute in thread pool to avoid blocking
+            twilio_message = await loop.run_in_executor(None, send_message)
+            
+            print(f"   ✅ Twilio API call successful!")
+            print(f"   📧 Message SID: {twilio_message.sid}")
+            print(f"   📊 Message status: {twilio_message.status}")
+            
+            logger.info(f"Sent Twilio WhatsApp message to {to_number}, SID: {twilio_message.sid}")
+            return {
+                "status": "success", 
+                "message_id": twilio_message.sid,
+                "twilio_status": twilio_message.status
+            }
             
         except Exception as e:
+            print(f"   ❌ Twilio API error:")
+            print(f"   Error: {str(e)}")
+            print(f"   Error type: {type(e).__name__}")
+            
             logger.error(f"Failed to send Twilio WhatsApp message: {e}")
             return {"status": "error", "error": str(e)}
     

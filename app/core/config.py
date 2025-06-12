@@ -30,14 +30,8 @@ class Settings(BaseSettings):
     WHATSAPP_WEBHOOK_VERIFY_TOKEN: Optional[str] = Field(None, env="WHATSAPP_WEBHOOK_VERIFY_TOKEN")
     WHATSAPP_BUSINESS_ACCOUNT_ID: Optional[str] = Field(None, env="WHATSAPP_BUSINESS_ACCOUNT_ID")
     
-    # Firebase Configuration (for FAQ caching)
-    FIREBASE_PROJECT_ID: Optional[str] = Field(None, env="FIREBASE_PROJECT_ID")
-    FIREBASE_PRIVATE_KEY_ID: Optional[str] = Field(None, env="FIREBASE_PRIVATE_KEY_ID")
-    FIREBASE_PRIVATE_KEY: Optional[str] = Field(None, env="FIREBASE_PRIVATE_KEY")
-    FIREBASE_CLIENT_EMAIL: Optional[str] = Field(None, env="FIREBASE_CLIENT_EMAIL")
-    FIREBASE_CLIENT_ID: Optional[str] = Field(None, env="FIREBASE_CLIENT_ID")
-    FIREBASE_AUTH_URI: str = Field(default="https://accounts.google.com/o/oauth2/auth", env="FIREBASE_AUTH_URI")
-    FIREBASE_TOKEN_URI: str = Field(default="https://oauth2.googleapis.com/token", env="FIREBASE_TOKEN_URI")
+    # Server Cache Configuration
+    CACHE_DEFAULT_TTL_HOURS: int = Field(default=48, env="CACHE_DEFAULT_TTL_HOURS")  # 2 days
     
     # Google Cloud (Optional - only needed for advanced features)
     GOOGLE_CLOUD_PROJECT: Optional[str] = Field(None, env="GOOGLE_CLOUD_PROJECT")
