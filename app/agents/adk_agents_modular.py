@@ -8,7 +8,7 @@ import asyncio
 from google.adk.agents import SequentialAgent
 
 # Import modular components
-from .mcp_servers import cleanup_mcp_connections
+from app.agents.mcp_servers import cleanup_mcp_connections
 from .core_agents import (
     create_auth_agent,
     create_language_agent,
