@@ -5,7 +5,7 @@ Handles user sessions using Google Cloud services (Firestore, Identity Platform)
 
 import logging
 import asyncio
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 from datetime import datetime, timedelta
 import json
 import os
@@ -25,6 +25,7 @@ class GoogleSessionManager:
         """Initialize session manager with Google Cloud services"""
         self.active_sessions: Dict[str, Dict[str, Any]] = {}
         self.session_timeout = timedelta(minutes=30)  # 30 minute timeout
+        self.use_firestore = False  # Will be set to True if Firestore is available
         
         # Initialize Firebase Admin SDK
         self._initialize_firebase()
@@ -33,38 +34,56 @@ class GoogleSessionManager:
         self._initialize_firestore()
         
     def _initialize_firebase(self):
-        """Initialize Firebase Admin SDK"""
+        """Initialize Firebase Admin SDK with fallback handling"""
         try:
             # Check if Firebase app is already initialized
             firebase_admin.get_app()
             logger.info("Firebase Admin SDK already initialized")
         except ValueError:
-            # Initialize Firebase Admin SDK
-            service_account_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-            if service_account_path:
-                cred = credentials.Certificate(service_account_path)
-                initialize_app(cred)
-                logger.info("Firebase Admin SDK initialized with service account")
-            else:
-                # Use default credentials
-                initialize_app()
-                logger.info("Firebase Admin SDK initialized with default credentials")
+            try:
+                # Initialize Firebase Admin SDK
+                service_account_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+                if service_account_path and os.path.exists(service_account_path):
+                    cred = credentials.Certificate(service_account_path)
+                    initialize_app(cred)
+                    logger.info("Firebase Admin SDK initialized with service account")
+                else:
+                    # Try with default credentials
+                    initialize_app()
+                    logger.info("Firebase Admin SDK initialized with default credentials")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Firebase Admin SDK: {e}")
+                # Continue without Firebase Auth features
     
     def _initialize_firestore(self):
-        """Initialize Firestore client"""
+        """Initialize Firestore client with fallback to in-memory storage"""
         try:
             service_account_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-            if service_account_path:
+            project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+            
+            if service_account_path and os.path.exists(service_account_path):
                 credentials_obj = service_account.Credentials.from_service_account_file(
                     service_account_path
                 )
-                self.db = firestore.Client(credentials=credentials_obj)
+                self.db = firestore.Client(credentials=credentials_obj, project=project_id)
+                logger.info("Firestore client initialized with service account")
+            elif project_id:
+                # Try with default credentials and explicit project
+                self.db = firestore.Client(project=project_id)
+                logger.info("Firestore client initialized with default credentials")
             else:
-                self.db = firestore.Client()
-            logger.info("Firestore client initialized")
+                # Fallback to in-memory storage
+                logger.warning("Google Cloud credentials not found, using in-memory session storage")
+                self.db = None
+                self.use_firestore = False
+                return
+                
+            self.use_firestore = True
+            
         except Exception as e:
-            logger.error(f"Failed to initialize Firestore: {e}")
-            raise
+            logger.warning(f"Failed to initialize Firestore, falling back to in-memory storage: {e}")
+            self.db = None
+            self.use_firestore = False
     
     async def create_session(self, user_id: str, initial_data: Optional[Dict] = None) -> str:
         """Create a new session for a user"""
@@ -84,13 +103,16 @@ class GoogleSessionManager:
         # Store in memory
         self.active_sessions[session_id] = session_data
         
-        # Store in Firestore
-        try:
-            doc_ref = self.db.collection('user_sessions').document(session_id)
-            doc_ref.set(session_data)
-            logger.info(f"Created session {session_id} for user {user_id}")
-        except Exception as e:
-            logger.error(f"Failed to store session in Firestore: {e}")
+        # Store in Firestore if available
+        if self.use_firestore and self.db:
+            try:
+                doc_ref = self.db.collection('user_sessions').document(session_id)
+                doc_ref.set(session_data)
+                logger.info(f"Created session {session_id} for user {user_id} (stored in Firestore)")
+            except Exception as e:
+                logger.error(f"Failed to store session in Firestore: {e}")
+        else:
+            logger.info(f"Created session {session_id} for user {user_id} (in-memory only)")
             
         return session_id
     
@@ -108,16 +130,17 @@ class GoogleSessionManager:
                 
             return session
         
-        # Try to load from Firestore
-        try:
-            doc_ref = self.db.collection('user_sessions').document(session_id)
-            doc = doc_ref.get()
-            if doc.exists:
-                session = doc.to_dict()
-                self.active_sessions[session_id] = session
-                return session
-        except Exception as e:
-            logger.error(f"Failed to load session from Firestore: {e}")
+        # Try to load from Firestore if available
+        if self.use_firestore and self.db:
+            try:
+                doc_ref = self.db.collection('user_sessions').document(session_id)
+                doc = doc_ref.get()
+                if doc.exists:
+                    session = doc.to_dict()
+                    self.active_sessions[session_id] = session
+                    return session
+            except Exception as e:
+                logger.error(f"Failed to load session from Firestore: {e}")
             
         return None
     
@@ -133,18 +156,19 @@ class GoogleSessionManager:
             # Return the most recent session
             return max(user_sessions, key=lambda x: x["last_activity"])
         
-        # Try Firestore
-        try:
-            sessions_ref = self.db.collection('user_sessions')
-            query = sessions_ref.where('user_id', '==', user_id).where('is_active', '==', True).order_by('last_activity', direction=firestore.Query.DESCENDING).limit(1)
-            docs = query.stream()
-            
-            for doc in docs:
-                session = doc.to_dict()
-                self.active_sessions[session["session_id"]] = session
-                return session
-        except Exception as e:
-            logger.error(f"Failed to load user session from Firestore: {e}")
+        # Try Firestore if available
+        if self.use_firestore and self.db:
+            try:
+                sessions_ref = self.db.collection('user_sessions')
+                query = sessions_ref.where('user_id', '==', user_id).where('is_active', '==', True).order_by('last_activity', direction=firestore.Query.DESCENDING).limit(1)
+                docs = query.stream()
+                
+                for doc in docs:
+                    session = doc.to_dict()
+                    self.active_sessions[session["session_id"]] = session
+                    return session
+            except Exception as e:
+                logger.error(f"Failed to load user session from Firestore: {e}")
             
         return None
     
@@ -159,17 +183,21 @@ class GoogleSessionManager:
         self.active_sessions[session_id].update(updates)
         self.active_sessions[session_id]["last_activity"] = datetime.now().isoformat()
         
-        # Update Firestore
-        try:
-            doc_ref = self.db.collection('user_sessions').document(session_id)
-            doc_ref.update({
-                **updates,
-                "last_activity": datetime.now().isoformat()
-            })
+        # Update Firestore if available
+        if self.use_firestore and self.db:
+            try:
+                doc_ref = self.db.collection('user_sessions').document(session_id)
+                doc_ref.update({
+                    **updates,
+                    "last_activity": datetime.now().isoformat()
+                })
+                return True
+            except Exception as e:
+                logger.error(f"Failed to update session in Firestore: {e}")
+                return False
+        else:
+            # In-memory only mode
             return True
-        except Exception as e:
-            logger.error(f"Failed to update session in Firestore: {e}")
-            return False
     
     async def add_message(self, session_id: str, role: str, content: str, metadata: Optional[Dict] = None) -> bool:
         """Add a message to the conversation history"""
@@ -280,13 +308,15 @@ class GoogleSessionManager:
         """Get session statistics"""
         active_count = len([s for s in self.active_sessions.values() if s["is_active"]])
         
-        # Get total sessions from Firestore
-        try:
-            sessions_ref = self.db.collection('user_sessions')
-            total_sessions = len(list(sessions_ref.stream()))
-        except Exception as e:
-            logger.error(f"Failed to get session count from Firestore: {e}")
-            total_sessions = 0
+        # Get total sessions from Firestore if available
+        total_sessions = 0
+        if self.use_firestore and self.db:
+            try:
+                sessions_ref = self.db.collection('user_sessions')
+                total_sessions = len(list(sessions_ref.stream()))
+            except Exception as e:
+                logger.error(f"Failed to get session count from Firestore: {e}")
+                total_sessions = 0
         
         return {
             "total_active_sessions": active_count,
@@ -294,6 +324,25 @@ class GoogleSessionManager:
             "total_sessions_in_firestore": total_sessions,
             "session_timeout_minutes": self.session_timeout.total_seconds() / 60
         }
+    
+    async def get_active_sessions(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get list of active sessions"""
+        try:
+            # Get active sessions from memory
+            active_sessions_list = [
+                session for session in self.active_sessions.values()
+                if session["is_active"]
+            ]
+            
+            # Sort by last activity (most recent first)
+            active_sessions_list.sort(key=lambda x: x["last_activity"], reverse=True)
+            
+            # Apply limit
+            return active_sessions_list[:limit]
+            
+        except Exception as e:
+            logger.error(f"Failed to get active sessions: {e}")
+            return []
     
     async def start_cleanup_task(self):
         """Start background task to clean up expired sessions"""

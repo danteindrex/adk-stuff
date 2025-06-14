@@ -103,21 +103,26 @@ class MonitoringService:
             }
             
         except ImportError:
-            # psutil not available, return mock data
+            # psutil not available, return error state
             return {
                 'name': 'memory_usage_percent',
-                'value': 45.0,  # Mock value
-                'metadata': {'mock': True}
+                'value': 0.0,
+                'metadata': {'error': 'psutil not available', 'status': 'unavailable'}
             }
         except Exception as e:
             logger.error(f"Failed to get memory usage metric: {e}")
             return None
     
     async def _get_active_sessions_metric(self) -> Optional[Dict[str, Any]]:
-        """Get active sessions metric (mock implementation)"""
+        """Get active sessions metric"""
         try:
-            # This would be replaced with actual session count from session manager
-            active_sessions = len(self.performance_buffer)  # Mock value
+            # Get actual session count from session manager if available
+            from main import session_manager
+            if session_manager:
+                stats = await session_manager.get_session_stats()
+                active_sessions = stats.get("total_active_sessions", 0)
+            else:
+                active_sessions = 0
             
             return {
                 'name': 'active_sessions',
@@ -250,6 +255,8 @@ class MonitoringService:
             
             # Get recent metrics
             memory_health = "unknown"
+            active_sessions = 0
+            
             if 'memory_usage_percent' in self.metrics_store:
                 recent_memory = [
                     m for m in self.metrics_store['memory_usage_percent']
@@ -259,12 +266,26 @@ class MonitoringService:
                     avg_memory = sum(m['value'] for m in recent_memory) / len(recent_memory)
                     memory_health = "healthy" if avg_memory < 80 else "degraded"
             
+            if 'active_sessions' in self.metrics_store:
+                recent_sessions = [
+                    m for m in self.metrics_store['active_sessions']
+                    if datetime.fromisoformat(m['timestamp']) > current_time - timedelta(minutes=5)
+                ]
+                if recent_sessions:
+                    active_sessions = recent_sessions[-1]['value']  # Get latest value
+            
             return {
                 'timestamp': current_time.isoformat(),
                 'overall_status': memory_health,
                 'memory_health': memory_health,
                 'metrics_collected': len(self.metrics_store),
-                'monitoring_active': self.is_monitoring
+                'monitoring_active': self.is_monitoring,
+                'total_messages_today': 0,  # No real data available
+                'success_rate_24h': 0.0,  # No real data available
+                'avg_response_time_ms': 0.0,  # No real data available
+                'services': {},  # No service data available
+                'language_distribution': {},  # No language data available
+                'error_summary': []  # No error data available
             }
             
         except Exception as e:
@@ -272,5 +293,102 @@ class MonitoringService:
             return {
                 'timestamp': datetime.now(timezone.utc).isoformat(),
                 'overall_status': 'unknown',
-                'error': str(e)
+                'error': str(e),
+                'total_messages_today': 0,
+                'success_rate_24h': 0.0,
+                'avg_response_time_ms': 0.0,
+                'services': {},
+                'language_distribution': {},
+                'error_summary': []
             }
+    
+    async def get_recent_logs(self, limit: int = 50, service_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get recent system logs"""
+        try:
+            # Since we don't have a real log storage, return empty list
+            # In a real implementation, this would query log storage
+            return []
+        except Exception as e:
+            logger.error(f"Failed to get recent logs: {e}")
+            return []
+    
+    async def get_usage_analytics(self, days: int = 7) -> List[Dict[str, Any]]:
+        """Get usage analytics for specified number of days"""
+        try:
+            # Since we don't have real analytics data, return empty list
+            # In a real implementation, this would query analytics storage
+            return []
+        except Exception as e:
+            logger.error(f"Failed to get usage analytics: {e}")
+            return []
+    
+    async def get_service_health(self) -> Dict[str, Any]:
+        """Get service health status"""
+        try:
+            # Return empty service health data
+            # In a real implementation, this would check actual services
+            return {}
+        except Exception as e:
+            logger.error(f"Failed to get service health: {e}")
+            return {}
+    
+    async def set_maintenance_mode(self, service_name: str, enabled: bool, message: Optional[str] = None, duration_minutes: Optional[int] = None) -> bool:
+        """Set maintenance mode for a service"""
+        try:
+            # Log maintenance mode change
+            logger.info(f"Maintenance mode {'enabled' if enabled else 'disabled'} for service: {service_name}", extra={
+                'service_name': service_name,
+                'enabled': enabled,
+                'message': message,
+                'duration_minutes': duration_minutes,
+                'timestamp': datetime.now(timezone.utc).isoformat()
+            })
+            return True
+        except Exception as e:
+            logger.error(f"Failed to set maintenance mode: {e}")
+            return False
+    
+    async def get_alerts(self, limit: int = 20, severity_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get system alerts"""
+        try:
+            # Since we don't have real alert storage, return empty list
+            # In a real implementation, this would query alert storage
+            return []
+        except Exception as e:
+            logger.error(f"Failed to get alerts: {e}")
+            return []
+    
+    async def acknowledge_alert(self, alert_id: str, acknowledged_by: str) -> bool:
+        """Acknowledge an alert"""
+        try:
+            # Log alert acknowledgment
+            logger.info(f"Alert {alert_id} acknowledged by {acknowledged_by}", extra={
+                'alert_id': alert_id,
+                'acknowledged_by': acknowledged_by,
+                'timestamp': datetime.now(timezone.utc).isoformat()
+            })
+            return True
+        except Exception as e:
+            logger.error(f"Failed to acknowledge alert: {e}")
+            return False
+    
+    async def get_performance_metrics(self, hours: int = 24) -> Dict[str, List[Dict[str, Any]]]:
+        """Get performance metrics for specified hours"""
+        try:
+            current_time = datetime.now(timezone.utc)
+            cutoff_time = current_time - timedelta(hours=hours)
+            
+            # Filter metrics by time range
+            filtered_metrics = {}
+            for metric_name, metrics_list in self.metrics_store.items():
+                filtered_list = [
+                    m for m in metrics_list
+                    if datetime.fromisoformat(m['timestamp']) > cutoff_time
+                ]
+                if filtered_list:
+                    filtered_metrics[metric_name] = filtered_list
+            
+            return filtered_metrics
+        except Exception as e:
+            logger.error(f"Failed to get performance metrics: {e}")
+            return {}

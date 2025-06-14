@@ -1,16 +1,13 @@
-# Production-optimized Dockerfile
+# Production-optimized Dockerfile with Internal MCP Tools
 FROM python:3.11-slim as builder
 
-# Install system dependencies
+# Install system dependencies for building
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
-
-# Install Node.js for MCP servers
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs
 
 # Set working directory
 WORKDIR /app
@@ -25,12 +22,11 @@ FROM python:3.11-slim
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     curl \
-    nodejs \
-    npm \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+RUN groupadd -r appuser && useradd -r -g appuser -m appuser
 
 # Set working directory
 WORKDIR /app
@@ -41,10 +37,10 @@ COPY --from=builder /root/.local /home/appuser/.local
 # Copy application code
 COPY . .
 
-# Install global MCP servers
-RUN npm install -g @microsoft/playwright-mcp @lharries/whatsapp-mcp
+# Create necessary directories
+RUN mkdir -p /app/logs /app/tmp /app/browser_use_logs
 
-# Set ownership
+# Set ownership of all app files
 RUN chown -R appuser:appuser /app
 
 # Switch to non-root user
@@ -56,6 +52,11 @@ ENV PATH=/home/appuser/.local/bin:$PATH
 # Set Python path
 ENV PYTHONPATH=/app
 
+# Environment variables for production
+ENV ENVIRONMENT=production
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
 # Expose port
 EXPOSE 8080
 
@@ -63,5 +64,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-# Run the application
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "4"]
+# Run the application with production settings
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1", "--worker-class", "uvicorn.workers.UvicornWorker"]

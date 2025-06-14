@@ -1,9 +1,11 @@
 """
 Application configuration settings
 """
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 import os
-from typing import List, Optional
+from typing import List, Optional, Annotated
 from pydantic_settings import BaseSettings
 from pydantic import Field
 
@@ -15,19 +17,24 @@ class Settings(BaseSettings):
     DEBUG: bool = Field(default=False, env="DEBUG")
     LOG_LEVEL: str = Field(default="INFO", env="LOG_LEVEL")
     
-    # WhatsApp Business API
-    WHATSAPP_ACCESS_TOKEN: str = Field(..., env="WHATSAPP_ACCESS_TOKEN")
-    WHATSAPP_PHONE_NUMBER_ID: str = Field(..., env="WHATSAPP_PHONE_NUMBER_ID")
-    WHATSAPP_WEBHOOK_VERIFY_TOKEN: str = Field(..., env="WHATSAPP_WEBHOOK_VERIFY_TOKEN")
-    WHATSAPP_BUSINESS_ACCOUNT_ID: str = Field(..., env="WHATSAPP_BUSINESS_ACCOUNT_ID")
+    # Twilio WhatsApp Configuration
+    TWILIO_ACCOUNT_SID: str = Field(..., env="TWILIO_ACCOUNT_SID")
+    TWILIO_AUTH_TOKEN: str = Field(..., env="TWILIO_AUTH_TOKEN")
+    TWILIO_WHATSAPP_NUMBER: str = Field(..., env="TWILIO_WHATSAPP_NUMBER")
+    TWILIO_WEBHOOK_VERIFY_TOKEN: str = Field(..., env="TWILIO_WEBHOOK_VERIFY_TOKEN")
+    TWILIO_API_KEY_SID: Optional[str] = Field(None, env="TWILIO_API_KEY_SID")
     
-    # Google Cloud Authentication
-    GOOGLE_OAUTH_CLIENT_ID: str = Field(..., env="GOOGLE_OAUTH_CLIENT_ID")
-    GOOGLE_OAUTH_CLIENT_SECRET: str = Field(..., env="GOOGLE_OAUTH_CLIENT_SECRET")
-    FIREBASE_PROJECT_ID: str = Field(..., env="FIREBASE_PROJECT_ID")
+    # Legacy WhatsApp Business API (can be removed after migration)
+    WHATSAPP_ACCESS_TOKEN: Optional[str] = Field(None, env="WHATSAPP_ACCESS_TOKEN")
+    WHATSAPP_PHONE_NUMBER_ID: Optional[str] = Field(None, env="WHATSAPP_PHONE_NUMBER_ID")
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: Optional[str] = Field(None, env="WHATSAPP_WEBHOOK_VERIFY_TOKEN")
+    WHATSAPP_BUSINESS_ACCOUNT_ID: Optional[str] = Field(None, env="WHATSAPP_BUSINESS_ACCOUNT_ID")
     
-    # Google Cloud
-    GOOGLE_CLOUD_PROJECT: str = Field(..., env="GOOGLE_CLOUD_PROJECT")
+    # Server Cache Configuration
+    CACHE_DEFAULT_TTL_HOURS: int = Field(default=48, env="CACHE_DEFAULT_TTL_HOURS")  # 2 days
+    
+    # Google Cloud (Optional - only needed for advanced features)
+    GOOGLE_CLOUD_PROJECT: Optional[str] = Field(None, env="GOOGLE_CLOUD_PROJECT")
     GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = Field(None, env="GOOGLE_APPLICATION_CREDENTIALS")
     
     # Security
@@ -57,26 +64,41 @@ class Settings(BaseSettings):
     RETRY_DELAY_SECONDS: int = Field(default=2, env="RETRY_DELAY_SECONDS")
     REQUEST_TIMEOUT_SECONDS: int = Field(default=30, env="REQUEST_TIMEOUT_SECONDS")
     
-    # Supported Languages
-    SUPPORTED_LANGUAGES: List[str] = Field(
-        default=["en", "lg", "luo", "nyn"], 
-        env="SUPPORTED_LANGUAGES"
-    )
+  
     
-    # Government Services
-    GOVERNMENT_SERVICES: List[str] = Field(
-        default=["nira", "ura", "nssf", "nlis"],
-        env="GOVERNMENT_SERVICES"
+    # FAQ Cache Configuration
+    FAQ_CACHE_ENABLED: bool = Field(default=True, env="FAQ_CACHE_ENABLED")
+    FAQ_CACHE_TTL_HOURS: int = Field(default=24, env="FAQ_CACHE_TTL_HOURS")
+    FAQ_SIMILARITY_THRESHOLD: float = Field(default=0.8, env="FAQ_SIMILARITY_THRESHOLD")
+    FAQ_MAX_CACHE_SIZE: int = Field(default=1000, env="FAQ_MAX_CACHE_SIZE")
+    SUPPORTED_LANGUAGES: Annotated[Optional[List[str]], NoDecode] = Field(
+        default=["en", "lg", "luo", "nyn"], env="SUPPORTED_LANGUAGES"
     )
-    
+    GOVERNMENT_SERVICES: Annotated[Optional[List[str]], NoDecode] = Field(
+        default=["nira", "ura", "nssf", "nlis"], env="GOVERNMENT_SERVICES"
+    )
+
+    # Validators to split the raw CSV strings into lists
+    @field_validator("SUPPORTED_LANGUAGES", "GOVERNMENT_SERVICES", mode="before")
+    @classmethod
+    def _split_csv(cls, v):
+        if isinstance(v, str):
+            return [item.strip() for item in v.split(",") if item.strip()]
+        return v
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",  # avoid errors on other .env entries
+    )
+
+
     @property
     def mcp_server_list(self) -> List[str]:
         """Get list of MCP server URLs"""
         return [url.strip() for url in self.MCP_SERVER_URLS.split(",")]
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+
 
 # Create global settings instance
 settings = Settings()

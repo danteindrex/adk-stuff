@@ -1,17 +1,35 @@
 """
 MCP Servers for Uganda E-Gov WhatsApp Helpdesk
-Modular MCP server integrations
 """
+from .twilio_tools import get_twilio_tools
+from .auth_tools import get_auth_tools
+from .browser_use_tools import get_browser_tools
+from .playwright_tools import get_playwright_tools
+from .internal_mcp_tools import get_all_internal_tools, cleanup_internal_tools
 
-from .auth_tools import get_google_auth_tools
-from .playwright_tools import get_playwright_tools, get_browser_use_tools
-from .whatsapp_tools import get_whatsapp_tools
-from .cleanup import cleanup_mcp_connections
+# Legacy import (can be removed after migration)
+# from .whatsapp_tools import get_whatsapp_tools
+
+async def cleanup_mcp_connections():
+    """Clean up any MCP connections"""
+    try:
+        from .playwright_tools import cleanup_playwright
+        await cleanup_playwright()
+    except Exception as e:
+        print(f"Error cleaning up playwright: {e}")
+    
+    try:
+        await cleanup_internal_tools()
+    except Exception as e:
+        print(f"Error cleaning up internal tools: {e}")
 
 __all__ = [
-    'get_google_auth_tools',
-    'get_playwright_tools', 
-    'get_browser_use_tools',
-    'get_whatsapp_tools',
-    'cleanup_mcp_connections'
+    'get_auth_tools',
+    'get_browser_tools',
+    'get_playwright_tools',
+    'get_twilio_tools',
+    'get_all_internal_tools',
+    'cleanup_mcp_connections',
+    # Legacy export (can be removed after migration)
+    # 'get_whatsapp_tools',
 ]

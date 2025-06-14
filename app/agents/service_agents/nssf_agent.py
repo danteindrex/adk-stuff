@@ -5,7 +5,7 @@ Handles NSSF (National Social Security Fund) services
 
 import logging
 from google.adk.agents import LlmAgent
-from ..mcp_servers.playwright_tools import get_enhanced_automation_tools, get_government_portal_tools
+from ..mcp_servers.internal_mcp_tools import get_government_portal_tools, get_internal_browser_tools
 
 logger = logging.getLogger(__name__)
 
@@ -13,11 +13,11 @@ async def create_nssf_agent():
     """Create NSSF balance agent with enhanced automation tools"""
     try:
         # Get both general automation tools and government-specific tools
-        automation_tools = await get_enhanced_automation_tools()
+        browser_tools = await get_internal_browser_tools()
         portal_tools = await get_government_portal_tools()
         
         # Combine all tools
-        all_tools = automation_tools + portal_tools
+        all_tools = browser_tools + portal_tools
         
         agent = LlmAgent(
             name="nssf_agent",

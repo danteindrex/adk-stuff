@@ -457,6 +457,28 @@ async def get_government_portal_tools():
     logger.info(f"Created {len(portal_tools)} government portal tools")
     return portal_tools
 
+async def cleanup_playwright():
+    """Clean up Playwright MCP connections and resources"""
+    global _playwright_toolset, _browser_use_toolset, _exit_stacks
+    
+    try:
+        # Clean up exit stacks
+        for exit_stack in _exit_stacks:
+            try:
+                await exit_stack.aclose()
+            except Exception as e:
+                logger.error(f"Error closing exit stack: {e}")
+        
+        # Reset global variables
+        _playwright_toolset = None
+        _browser_use_toolset = None
+        _exit_stacks.clear()
+        
+        logger.info("Playwright MCP connections cleaned up successfully")
+        
+    except Exception as e:
+        logger.error(f"Error during Playwright cleanup: {e}")
+
 # Import the smart_web_automation function to make it available globally
 def smart_web_automation(task_description: str, url: str, form_data: Dict[str, Any] = None, expected_elements: List[str] = None, retry_count: int = 3) -> dict:
     """Global access to smart web automation"""

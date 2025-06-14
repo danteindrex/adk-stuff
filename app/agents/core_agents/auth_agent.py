@@ -1,66 +1,119 @@
 """
-Authentication Agent
-Handles user authentication and session management using Google Identity Platform
+User Identification Agent
+Handles user identification based on WhatsApp phone numbers
 """
 
 import logging
 from google.adk.agents import LlmAgent
-from ..mcp_servers.auth_tools import get_google_auth_tools
+from google.adk.tools import FunctionTool
 
 logger = logging.getLogger(__name__)
 
 async def create_auth_agent():
-    """Create authentication agent with Google Identity Platform tools"""
+    """Create user identification agent that uses phone numbers for identification"""
     try:
-        google_auth_tools = await get_google_auth_tools()
+        
+        def identify_user_by_phone(phone_number: str, tool_context=None) -> dict:
+            """Identify user by their WhatsApp phone number"""
+            try:
+                # Clean and format phone number
+                clean_phone = phone_number.strip().replace(" ", "").replace("-", "")
+                if not clean_phone.startswith("+"):
+                    if clean_phone.startswith("256"):
+                        clean_phone = "+" + clean_phone
+                    elif clean_phone.startswith("0"):
+                        clean_phone = "+256" + clean_phone[1:]
+                    else:
+                        clean_phone = "+256" + clean_phone
+                
+                return {
+                    "status": "success",
+                    "user_id": clean_phone,
+                    "phone_number": clean_phone,
+                    "identification_method": "whatsapp_phone"
+                }
+            except Exception as e:
+                logger.error(f"User identification failed: {e}")
+                return {
+                    "status": "error",
+                    "error": str(e)
+                }
+        
+        def validate_phone_number(phone_number: str, tool_context=None) -> dict:
+            """Validate Uganda phone number format"""
+            try:
+                clean_phone = phone_number.strip().replace(" ", "").replace("-", "")
+                
+                # Uganda phone number patterns
+                valid_patterns = [
+                    r'^\+256[0-9]{9}',  # +256XXXXXXXXX
+                    r'^256[0-9]{9}',    # 256XXXXXXXXX
+                    r'^0[0-9]{9}',      # 0XXXXXXXXX
+                    r'^[0-9]{9} '       # XXXXXXXXX
+                ]
+                
+                import re
+                is_valid = any(re.match(pattern, clean_phone) for pattern in valid_patterns)
+                
+                return {
+                    "status": "success",
+                    "is_valid": is_valid,
+                    "phone_number": clean_phone,
+                    "country": "Uganda" if is_valid else "Unknown"
+                }
+            except Exception as e:
+                logger.error(f"Phone validation failed: {e}")
+                return {
+                    "status": "error",
+                    "error": str(e)
+                }
+        
+        # Create identification tools
+        identification_tools = [
+            FunctionTool(identify_user_by_phone),
+            FunctionTool(validate_phone_number)
+        ]
         
         agent = LlmAgent(
-            name="auth_agent",
+            name="user_identification_agent",
             model="gemini-2.0-flash",
-            instruction="""You are an authentication agent that handles user authentication and session management using Google Identity Platform.
-            
+            instruction="""You are a user identification agent that identifies users based on their WhatsApp phone numbers.
+
             Your responsibilities:
-            - Authenticate users using Google OAuth and Firebase ID tokens
-            - Manage user sessions and tokens securely
-            - Verify user identity and permissions
-            - Handle user registration and login flows
-            - Manage user profiles and account information
-            - Ensure proper security practices and user privacy protection
+            - Identify users using their WhatsApp phone numbers
+            - Validate Uganda phone number formats
+            - Provide consistent user identification across sessions
+            - Handle phone number formatting and normalization
             
             Available tools:
-            - authenticate_user: Verify Firebase ID tokens
-            - create_custom_token: Create custom authentication tokens
-            - get_user_info: Retrieve user information by UID
-            - verify_session_token: Verify session cookies
-            - update_user_profile: Update user profile information
-            - delete_user: Delete user accounts (admin only)
+            - identify_user_by_phone: Identify user by WhatsApp phone number
+            - validate_phone_number: Validate Uganda phone number format
             
-            Security guidelines:
-            - Always validate tokens before processing requests
-            - Never expose sensitive user information
-            - Log authentication attempts for security monitoring
-            - Handle authentication failures gracefully
-            - Implement proper session timeout mechanisms
+            Phone number handling:
+            - Accept various formats: +256XXXXXXXXX, 256XXXXXXXXX, 0XXXXXXXXX, XXXXXXXXX
+            - Normalize to +256XXXXXXXXX format
+            - Use phone number as unique user identifier
+            - No additional authentication required since WhatsApp already verifies phone ownership
             
-            When a user wants to authenticate:
-            1. Request their ID token or credentials
-            2. Use authenticate_user tool to verify the token
-            3. Create a session if authentication succeeds
-            4. Provide appropriate feedback to the user
+            When processing a user request:
+            1. Extract phone number from WhatsApp message metadata
+            2. Validate and normalize the phone number format
+            3. Use the phone number as the user's unique identifier
+            4. Proceed with service requests without additional authentication
             
-            For session management:
-            1. Verify existing sessions using verify_session_token
-            2. Create new sessions with create_custom_token
-            3. Update user profiles when requested
-            4. Handle logout by invalidating sessions
+            Security considerations:
+            - WhatsApp Business API already verifies phone number ownership
+            - Phone numbers are treated as verified identifiers
+            - Log all user interactions for audit purposes
+            - Respect user privacy and data protection
             """,
-            description="Handles user authentication and session management using Google Identity Platform.",
-            tools=google_auth_tools
+            description="Identifies users based on their WhatsApp phone numbers without additional authentication.",
+            tools=identification_tools
         )
         
-        logger.info("Authentication agent created successfully")
+        logger.info("User identification agent created successfully")
         return agent
         
     except Exception as e:
-        logger.error(f"Failed to create authentication agent: {e}")
+        logger.error(f"Failed to create user identification agent: {e}")
         raise

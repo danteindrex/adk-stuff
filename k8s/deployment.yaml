@@ -27,26 +27,52 @@ spec:
             secretKeyRef:
               name: app-secrets
               key: google-cloud-project
-        - name: WHATSAPP_ACCESS_TOKEN
+        - name: TWILIO_ACCOUNT_SID
           valueFrom:
             secretKeyRef:
-              name: app-secrets
-              key: whatsapp-access-token
-        - name: WHATSAPP_PHONE_NUMBER_ID
+              name: whatsapp-secrets
+              key: twilio-account-sid
+        - name: TWILIO_AUTH_TOKEN
           valueFrom:
             secretKeyRef:
-              name: app-secrets
-              key: whatsapp-phone-number-id
-        - name: WHATSAPP_WEBHOOK_VERIFY_TOKEN
+              name: whatsapp-secrets
+              key: twilio-auth-token
+        - name: TWILIO_WHATSAPP_NUMBER
           valueFrom:
             secretKeyRef:
-              name: app-secrets
-              key: whatsapp-webhook-verify-token
-        - name: WHATSAPP_BUSINESS_ACCOUNT_ID
+              name: whatsapp-secrets
+              key: twilio-whatsapp-number
+        - name: TWILIO_WEBHOOK_VERIFY_TOKEN
           valueFrom:
             secretKeyRef:
-              name: app-secrets
-              key: whatsapp-business-account-id
+              name: whatsapp-secrets
+              key: twilio-webhook-verify-token
+        - name: TWILIO_API_KEY_SID
+          valueFrom:
+            secretKeyRef:
+              name: whatsapp-secrets
+              key: twilio-api-key-sid
+        # Legacy WhatsApp variables (can be removed after migration)
+        # - name: WHATSAPP_ACCESS_TOKEN
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: whatsapp-secrets
+        #       key: whatsapp-access-token
+        # - name: WHATSAPP_PHONE_NUMBER_ID
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: app-secrets
+        #       key: whatsapp-phone-number-id
+        # - name: WHATSAPP_WEBHOOK_VERIFY_TOKEN
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: app-secrets
+        #       key: whatsapp-webhook-verify-token
+        # - name: WHATSAPP_BUSINESS_ACCOUNT_ID
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: app-secrets
+        #       key: whatsapp-business-account-id
         - name: FIREBASE_PROJECT_ID
           valueFrom:
             secretKeyRef:
@@ -86,31 +112,20 @@ spec:
           limits:
             memory: "1Gi"
             cpu: "500m"
-        livenessProbe:
+        readinessProbe:
           httpGet:
             path: /health
             port: 8080
           initialDelaySeconds: 30
-          periodSeconds: 30
-          timeoutSeconds: 10
-          failureThreshold: 3
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: 8080
-          initialDelaySeconds: 10
           periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-        volumeMounts:
-        - name: service-account
-          mountPath: /app/service-account.json
-          subPath: service-account.json
-          readOnly: true
-      volumes:
-      - name: service-account
-        secret:
-          secretName: google-service-account
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+      imagePullSecrets:
+      - name: gcr-json-key
 ---
 apiVersion: v1
 kind: Service
@@ -120,23 +135,31 @@ spec:
   selector:
     app: uganda-egov-helpdesk
   ports:
-  - protocol: TCP
-    port: 80
+  - port: 80
     targetPort: 8080
-  type: LoadBalancer
+  type: ClusterIP
 ---
-apiVersion: v1
-kind: Service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
 metadata:
-  name: uganda-egov-helpdesk-metrics
-  labels:
-    app: uganda-egov-helpdesk
+  name: uganda-egov-helpdesk-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
-  selector:
-    app: uganda-egov-helpdesk
-  ports:
-  - name: metrics
-    port: 8080
-    targetPort: 8080
-    protocol: TCP
-  clusterIP: None
+  tls:
+  - hosts:
+    - api.ugandaegov.com
+    secretName: uganda-egov-tls
+  rules:
+  - host: api.ugandaegov.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: uganda-egov-helpdesk-service
+            port:
+              number: 80

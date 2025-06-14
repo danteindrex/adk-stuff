@@ -1,3 +1,55 @@
+# Core FastAPI dependencies
+fastapi[all]
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-multipart
+aiohttp
+python-dotenv
+
+# Security and encryption
+cryptography
+python-jose[cryptography]
+passlib[bcrypt]
+PyJWT
+
+# Session management
+redis
+
+# Browser automation
+playwright
+browser-use
+
+# Google ADK for multi-agent system
+google-adk
+
+# Language detection and processing
+langdetect
+
+# Utilities
+requests
+psutil
+Pillow
+
+# Testing
+pytest
+pytest-asyncio
+pytest-mock
+pytest-cov
+httpx
+
+# Rate limiting
+slowapi
+
+# Logging
+structlog
+
+# Basic monitoring (simplified)
+prometheus-client
+
+# Add this line to your existing requirements
+twilio
+
 fastapi[all]
 uvicorn[standard]
 pydantic
