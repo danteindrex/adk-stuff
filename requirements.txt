@@ -27,13 +27,29 @@ playwright[chromium]
 # Google ADK for multi-agent system
 google-adk
 
+# Google Cloud services
+google-cloud-run
+google-cloud-monitoring
+google-cloud-logging
+google-cloud-translate
+google-cloud-firestore
+firebase-admin
+google-auth
+google-auth-oauthlib
+
 # Language detection and processing
 langdetect
+
+# Communication
+twilio
 
 # Utilities
 requests
 psutil
 Pillow
+pandas
+numpy
+websockets
 
 # Testing
 pytest
@@ -45,53 +61,13 @@ httpx
 # Rate limiting
 slowapi
 
-# Logging
-structlog
-
-# Basic monitoring (simplified)
-prometheus-client
-
-# Add this line to your existing requirements
-twilio
-
-fastapi[all]
-uvicorn[standard]
-pydantic
-pydantic-settings
-python-multipart
-aiohttp
-python-dotenv
-cryptography
-redis
-playwright
-google-cloud-run
-google-cloud-monitoring
-google-cloud-logging
-google-cloud-translate
-google-cloud-firestore
-firebase-admin
-google-auth
-google-auth-oauthlib
-google-adk
-psutil
-langdetect
-requests
-websockets
-Pillow
-pandas
-numpy
-python-jose[cryptography]
-passlib[bcrypt]
-pytest
-pytest-asyncio
-pytest-mock
-pytest-cov
-httpx
-slowapi
+# Logging and monitoring
 structlog
 prometheus-client
 opentelemetry-api
 opentelemetry-sdk
 opentelemetry-instrumentation-fastapi
 opentelemetry-exporter-gcp-monitoring
-browser-use
+
+# Database
+supabase
