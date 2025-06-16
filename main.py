@@ -273,53 +273,25 @@ async def lifespan(app: FastAPI):
         await session_manager.start_cleanup_task()
         logger.info("Session manager initialized")
         
-        # Validate Twilio configuration
-        print("\n📞 VALIDATING TWILIO CONFIGURATION:")
+        # Initialize WhatsApp Web client
+        print("\n📱 INITIALIZING WHATSAPP WEB CLIENT:")
+        global whatsapp_web_client
         try:
-            # Check credentials format
-            if not settings.TWILIO_ACCOUNT_SID:
-                print("   ❌ TWILIO_ACCOUNT_SID not set")
-            elif not settings.TWILIO_ACCOUNT_SID.startswith('AC'):
-                print(f"   ❌ TWILIO_ACCOUNT_SID should start with 'AC', got: {settings.TWILIO_ACCOUNT_SID[:8]}...")
+            print("   🚀 Starting WhatsApp Web automation...")
+            whatsapp_web_client = await get_whatsapp_client()
+            
+            if whatsapp_web_client.is_authenticated:
+                print("   ✅ WhatsApp Web client authenticated successfully")
+                print(f"   📱 Phone number: {whatsapp_web_client.phone_number}")
             else:
-                print(f"   ✅ TWILIO_ACCOUNT_SID: {settings.TWILIO_ACCOUNT_SID[:8]}...")
+                print("   ⚠️  WhatsApp Web client started but not authenticated")
+                print("   📱 Please scan QR code to authenticate")
             
-            if not settings.TWILIO_AUTH_TOKEN:
-                print("   ❌ TWILIO_AUTH_TOKEN not set")
-            elif len(settings.TWILIO_AUTH_TOKEN) < 30:
-                print(f"   ⚠️  TWILIO_AUTH_TOKEN seems too short (length: {len(settings.TWILIO_AUTH_TOKEN)})")
-            else:
-                print("   ✅ TWILIO_AUTH_TOKEN: SET")
-            
-            if not settings.TWILIO_WHATSAPP_NUMBER:
-                print("   ❌ TWILIO_WHATSAPP_NUMBER not set")
-            else:
-                print(f"   ✅ TWILIO_WHATSAPP_NUMBER: {settings.TWILIO_WHATSAPP_NUMBER}")
-            
-            # Test Twilio client initialization
-            print("   🔧 Testing Twilio client initialization...")
-            test_client = TwilioClient()
-            print("   ✅ Twilio client initialized successfully")
-            
-            # Test basic Twilio API access
-            print("   🔍 Testing Twilio API access...")
-            from twilio.rest import Client
-            api_client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-            account = api_client.api.accounts(settings.TWILIO_ACCOUNT_SID).fetch()
-            print(f"   ✅ Twilio API access successful - Account status: {account.status}")
-            
-        except Exception as twilio_error:
-            print(f"   ❌ Twilio configuration error: {twilio_error}")
+        except Exception as whatsapp_error:
+            print(f"   ❌ WhatsApp Web initialization error: {whatsapp_error}")
             print("   ⚠️  WhatsApp message sending will not work")
-            
-            # Provide specific guidance based on error
-            error_str = str(twilio_error)
-            if "20003" in error_str or "Authenticate" in error_str:
-                print("   💡 Authentication Error - Run: python test_twilio_credentials.py")
-            elif "20404" in error_str:
-                print("   💡 Account not found - Check your TWILIO_ACCOUNT_SID")
-            else:
-                print("   💡 Check your Twilio credentials and try: python test_twilio_credentials.py")
+            print("   💡 Make sure Playwright is installed: playwright install chromium")
+            whatsapp_web_client = None
         
         # Initialize modular ADK agent system
         print("\n🤖 INITIALIZING ADK AGENT SYSTEM:")
@@ -389,6 +361,10 @@ async def lifespan(app: FastAPI):
         if monitoring_service:
             await monitoring_service.log_error_event("shutdown", "System shutdown initiated", {"phase": "cleanup"})
             await monitoring_service.stop_monitoring()
+        
+        # Cleanup WhatsApp Web client
+        if whatsapp_web_client:
+            await whatsapp_web_client.stop()
         
         # Cleanup MCP connections
         await cleanup_mcp_connections()
@@ -475,12 +451,12 @@ app.include_router(admin_router, prefix="/admin", tags=["Admin"])
 from fastapi.staticfiles import StaticFiles
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Production-optimized WhatsApp webhook endpoint with enhanced automation
+# Production-optimized WhatsApp Web automation
 # Update imports
-from app.services.twilio_client import TwilioClient
+from app.services.whatsapp_web_client import get_whatsapp_client
 
-# Replace WhatsApp client initialization with Twilio
-twilio_client = TwilioClient()
+# WhatsApp Web client will be initialized in lifespan
+whatsapp_web_client = None
 
 # Update webhook endpoint
 # Fixed webhook function
@@ -576,23 +552,27 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
         print(f"📝 Response length: {len(response_text)} characters")
         print(f"📄 Response preview: {response_text[:200]}...")
         
-        # Send response back to WhatsApp via Twilio
+        # Send response back to WhatsApp via WhatsApp Web
         print(f"\n📱 SENDING WHATSAPP RESPONSE:")
         print(f"   To: {user_id}")
         print(f"   Message: {response_text[:100]}...")
         
         try:
-            # Send the response back to WhatsApp
-            send_result = await twilio_client.send_text_message(user_id, response_text)
-            
-            if send_result.get("status") == "success":
-                print(f"   ✅ WhatsApp message sent successfully!")
-                print(f"   📧 Message ID: {send_result.get('message_id')}")
-                whatsapp_status = "sent"
+            if whatsapp_web_client and whatsapp_web_client.is_authenticated:
+                # Send the response back to WhatsApp
+                send_result = await whatsapp_web_client.send_text_message(user_id, response_text)
+                
+                if send_result.get("status") == "success":
+                    print(f"   ✅ WhatsApp message sent successfully!")
+                    print(f"   📧 Message ID: {send_result.get('message_id')}")
+                    whatsapp_status = "sent"
+                else:
+                    print(f"   ❌ Failed to send WhatsApp message:")
+                    print(f"   Error: {send_result.get('error')}")
+                    whatsapp_status = "failed"
             else:
-                print(f"   ❌ Failed to send WhatsApp message:")
-                print(f"   Error: {send_result.get('error')}")
-                whatsapp_status = "failed"
+                print(f"   ❌ WhatsApp Web client not available or not authenticated")
+                whatsapp_status = "not_authenticated"
                 
         except Exception as send_error:
             print(f"   ❌ WhatsApp sending error:")
