@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Clone - Uganda E-Gov Assistant</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-container">
+            <div class="login-header">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" class="whatsapp-logo">
+                <h1>WhatsApp Clone</h1>
+                <p>Uganda E-Government Assistant</p>
+            </div>
+            
+            <div class="login-content">
+                <div class="feature-list">
+                    <div class="feature-item">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>Secure messaging with AI assistant</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-university"></i>
+                        <span>Access government services</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-language"></i>
+                        <span>Multi-language support</span>
+                    </div>
+                </div>
+                
+                <div class="login-buttons">
+                    <div id="g_id_onload"
+                         data-client_id="YOUR_GOOGLE_CLIENT_ID"
+                         data-callback="handleCredentialResponse"
+                         data-auto_prompt="false">
+                    </div>
+                    <div class="g_id_signin" 
+                         data-type="standard"
+                         data-size="large"
+                         data-theme="outline"
+                         data-text="sign_in_with"
+                         data-shape="rectangular"
+                         data-logo_alignment="left">
+                    </div>
+                    
+                    <div class="divider">
+                        <span>or</span>
+                    </div>
+                    
+                    <button class="demo-login-btn" onclick="demoLogin()">
+                        <i class="fas fa-play"></i>
+                        Try Demo (No Login Required)
+                    </button>
+                </div>
+                
+                <div class="twilio-option">
+                    <div class="twilio-toggle">
+                        <label class="switch">
+                            <input type="checkbox" id="twilioToggle">
+                            <span class="slider round"></span>
+                        </label>
+                        <span>Enable Twilio Integration</span>
+                    </div>
+                    <p class="twilio-description">
+                        When enabled, messages will also be sent via Twilio WhatsApp API
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main WhatsApp Interface -->
+    <div id="whatsappInterface" class="whatsapp-container" style="display: none;">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <!-- Header -->
+            <div class="sidebar-header">
+                <div class="user-info">
+                    <img id="userAvatar" src="https://via.placeholder.com/40" alt="User" class="user-avatar">
+                    <span id="userName">User</span>
+                </div>
+                <div class="header-actions">
+                    <button class="icon-btn" title="New chat">
+                        <i class="fas fa-comment-alt"></i>
+                    </button>
+                    <button class="icon-btn" title="Menu" onclick="showMenu()">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search -->
+            <div class="search-container">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Search or start new chat" id="searchInput">
+                </div>
+            </div>
+
+            <!-- Chat List -->
+            <div class="chat-list">
+                <div class="chat-item active" data-chat-id="ai-assistant">
+                    <img src="https://via.placeholder.com/50" alt="AI Assistant" class="chat-avatar">
+                    <div class="chat-info">
+                        <div class="chat-header">
+                            <h3>🇺🇬 Uganda E-Gov Assistant</h3>
+                            <span class="chat-time">now</span>
+                        </div>
+                        <p class="last-message">Hello! I can help you with government services...</p>
+                    </div>
+                    <div class="chat-status">
+                        <span class="unread-count">1</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="chat-area">
+            <!-- Chat Header -->
+            <div class="chat-header">
+                <div class="chat-contact">
+                    <img src="https://via.placeholder.com/40" alt="AI Assistant" class="contact-avatar">
+                    <div class="contact-info">
+                        <h3>🇺🇬 Uganda E-Gov Assistant</h3>
+                        <span class="contact-status">
+                            <span class="online-indicator"></span>
+                            Online - AI Assistant
+                        </span>
+                    </div>
+                </div>
+                <div class="chat-actions">
+                    <button class="icon-btn" title="Search">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <button class="icon-btn" title="More options">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Messages Container -->
+            <div class="messages-container" id="messagesContainer">
+                <div class="message received">
+                    <div class="message-content">
+                        <p>🇺🇬 Hello! I'm the Uganda E-Government assistant.</p>
+                        <p>I can help you with:</p>
+                        <ul>
+                            <li>• Birth Certificate (NIRA) - Check status</li>
+                            <li>• Tax Status (URA) - Check balance</li>
+                            <li>• NSSF Balance - Check contributions</li>
+                            <li>• Land Verification (NLIS) - Verify ownership</li>
+                        </ul>
+                        <p>Available in English, Luganda, Luo, and Runyoro.</p>
+                        <p>How can I assist you today?</p>
+                    </div>
+                    <div class="message-time">12:00 PM</div>
+                </div>
+            </div>
+
+            <!-- Message Input -->
+            <div class="message-input-container">
+                <div class="message-input">
+                    <button class="icon-btn" title="Attach">
+                        <i class="fas fa-paperclip"></i>
+                    </button>
+                    <div class="input-wrapper">
+                        <input type="text" id="messageInput" placeholder="Type a message" autocomplete="off">
+                        <button class="icon-btn emoji-btn" title="Emoji">
+                            <i class="fas fa-smile"></i>
+                        </button>
+                    </div>
+                    <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Menu Overlay -->
+    <div id="menuOverlay" class="menu-overlay" style="display: none;">
+        <div class="menu-content">
+            <div class="menu-item" onclick="showProfile()">
+                <i class="fas fa-user"></i>
+                <span>Profile</span>
+            </div>
+            <div class="menu-item" onclick="showSettings()">
+                <i class="fas fa-cog"></i>
+                <span>Settings</span>
+            </div>
+            <div class="menu-item" onclick="showTwilioSettings()">
+                <i class="fas fa-phone"></i>
+                <span>Twilio Settings</span>
+            </div>
+            <div class="menu-item" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Log out</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Twilio Settings Modal -->
+    <div id="twilioModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Twilio WhatsApp Settings</h2>
+                <button class="close-btn" onclick="closeTwilioModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="twilioPhone">Your WhatsApp Number:</label>
+                    <input type="tel" id="twilioPhone" placeholder="+256700000000">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="enableTwilioSync">
+                        Send messages to actual WhatsApp
+                    </label>
+                </div>
+                <p class="twilio-note">
+                    <i class="fas fa-info-circle"></i>
+                    When enabled, your messages will be sent to the configured Twilio WhatsApp number.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeTwilioModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveTwilioSettings()">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+        <div class="loading-spinner"></div>
+        <span>AI is thinking...</span>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="script.js"></script>
+</body>
+</html></html>

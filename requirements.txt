@@ -19,6 +19,10 @@ redis
 # Browser automation
 playwright
 browser-use
+langchain-google-genai
+
+# WhatsApp Web automation dependencies
+playwright[chromium]
 
 # Google ADK for multi-agent system
 google-adk
