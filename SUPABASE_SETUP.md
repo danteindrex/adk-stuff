@@ -44,7 +44,7 @@ The$1000matovu
 3. Copy and paste the entire content from `supabase_whatsapp_schema.sql`
 4. Click "Run" to execute the schema
 
-### 5. Install Dependencies
+### 5. Install Dependencies>
 
 ```bash
 pip install supabase
