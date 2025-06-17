@@ -4,31 +4,35 @@ A comprehensive multi-agent AI system that enables 45+ million Ugandans to acces
 
 ## 🌟 Project Overview
 
-This full-stack application provides:
-- **WhatsApp Business Integration** - Citizens access services via WhatsApp
+This production-ready full-stack application provides:
+- **WhatsApp Business Integration** - Citizens access services via WhatsApp using Twilio
 - **Web-based WhatsApp Clone** - Demo and testing interface with Google OAuth
 - **Supabase Database** - Persistent storage for all user interactions
-- **Comprehensive Admin Dashboard** - Complete system control and monitoring
+- **Comprehensive Admin Dashboard** - Complete system control and monitoring with real-time updates
 - **Multi-language Support** - English, Luganda, Luo, Runyoro
-- **Government Service Automation** - NIRA, URA, NSSF, NLIS integration
+- **Government Service Automation** - NIRA, URA, NSSF, NLIS integration with browser automation
+- **Modular Agent Architecture** - Google ADK-powered multi-agent system with MCP servers
 
 ## 🏗️ Full Stack Architecture
 
 ### Frontend Components
-- **WhatsApp Business API** - Primary user interface
-- **WhatsApp Clone Web App** - Browser-based interface with Google OAuth
-- **Admin Dashboard** - Complete system management interface
+- **WhatsApp Business API** - Primary user interface via Twilio
+- **WhatsApp Clone Web App** - Browser-based interface with Google OAuth (`/whatsapp_clone/`)
+- **Admin Dashboard** - Complete system management interface (`/static/admin.html`)
 
 ### Backend Components
-- **FastAPI Application** - Main API server
+- **FastAPI Application** - Main API server (`main.py`)
 - **Supabase Database** - PostgreSQL with real-time features
 - **Redis Cache** - Session and performance optimization
-- **Google ADK Agents** - Multi-agent AI orchestration
+- **Google ADK Agents** - Multi-agent AI orchestration (`/app/agents/`)
+- **MCP Servers** - Modular Control Protocol servers for browser automation
+- **Monitoring Service** - Real-time system monitoring and analytics
 
 ### Infrastructure
 - **Docker & Docker Compose** - Containerized deployment
 - **Google Cloud Run** - Scalable cloud deployment
-- **Monitoring & Analytics** - Real-time system insights
+- **Kubernetes** - Container orchestration (`/k8s/`)
+- **Monitoring & Analytics** - Real-time system insights with Prometheus
 
 ## 🚀 Complete Setup Guide
 
@@ -42,10 +46,10 @@ This full-stack application provides:
 - **Git**
 
 #### Required Accounts
-- **Supabase Account** - Database hosting
-- **Google Cloud Account** - OAuth and deployment
-- **Meta Developer Account** - WhatsApp Business API
-- **Twilio Account** - Alternative WhatsApp integration
+- **Supabase Account** - Database hosting (free tier available)
+- **Google Cloud Account** - OAuth and deployment (free tier available)
+- **Twilio Account** - WhatsApp Business API integration (required)
+- **Meta Developer Account** - Optional for direct WhatsApp Business API
 
 ### Step 1: Clone and Initial Setup
 
@@ -96,15 +100,40 @@ python setup_whatsapp_clone.py
    - `https://your-domain.com`
 5. Copy **Client ID**
 
-### Step 4: WhatsApp Business API Setup
+### Step 4: Twilio WhatsApp Setup (Primary Method)
 
-#### 4.1 Meta Developer Setup
+#### 4.1 Create Twilio Account
+1. Go to [twilio.com](https://www.twilio.com) and create account
+2. Verify your phone number and email
+3. Complete account setup and verification
+
+#### 4.2 Get Twilio Credentials
+1. Go to **Console Dashboard**
+2. Copy **Account SID** (starts with 'AC')
+3. Copy **Auth Token** (click to reveal)
+4. Go to **Messaging** → **Try it out** → **Send a WhatsApp message**
+5. Copy the **WhatsApp Sandbox Number** (e.g., `whatsapp:+14155238886`)
+
+#### 4.3 Configure WhatsApp Sandbox
+1. In Twilio Console, go to **Messaging** → **Settings** → **WhatsApp sandbox settings**
+2. Set webhook URL: `https://your-domain.com/whatsapp/webhook`
+3. Set HTTP method: **POST**
+4. Save configuration
+
+#### 4.4 Test WhatsApp Integration
+1. Send "join [sandbox-keyword]" to your Twilio WhatsApp number
+2. You should receive a confirmation message
+3. Test by sending a message - you should get a response
+
+### Step 4b: Meta WhatsApp Business API (Optional Alternative)
+
+#### 4b.1 Meta Developer Setup
 1. Go to [developers.facebook.com](https://developers.facebook.com)
 2. Create new app: **Business** type
 3. Add **WhatsApp Business API** product
 4. Complete business verification process
 
-#### 4.2 Get WhatsApp Credentials
+#### 4b.2 Get WhatsApp Credentials
 1. Go to **WhatsApp** → **API Setup**
 2. Copy **Access Token**
 3. Copy **Phone Number ID**
@@ -210,6 +239,13 @@ npx playwright install
 
 # Install additional tools
 pip install browser-use
+
+# Test Twilio credentials
+python -c "
+from app.services.twilio_client import TwilioClient
+client = TwilioClient()
+print('✅ Twilio client initialized successfully')
+"
 ```
 
 ### Step 7: Local Development Setup
@@ -272,146 +308,220 @@ gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8080
 
 ## 🎛️ Admin Dashboard - Complete System Control
 
-The admin dashboard provides comprehensive control over the entire application. Access it at:
+The admin dashboard provides comprehensive control over the entire application with real-time monitoring and management capabilities. Access it at:
 ```
 https://your-domain.com/admin
 ```
 
+**Default Admin Credentials:**
+- Username: `trevor`
+- Password: `The$1000`
+
 ### Dashboard Features
 
-#### 🏠 **Main Dashboard**
-- **Real-time System Status** - All services health
+#### 🏠 **Main Dashboard** (`/admin`)
+- **Real-time System Status** - All services health with live indicators
 - **Live User Activity** - Active sessions and conversations
-- **Performance Metrics** - Response times, success rates
+- **Performance Metrics** - Response times, success rates, throughput
+- **Service Health Cards** - NIRA, URA, NSSF, NLIS status monitoring
+- **Language Distribution Chart** - Real-time usage analytics
+- **System Logs** - Live log streaming with filtering
 - **Quick Actions** - Emergency controls and system commands
 
-#### 👥 **User Management**
+#### 👥 **User Session Management**
 ```
-/admin/users
+GET /admin/users/sessions
 ```
-- **User List** - All registered users with activity
-- **User Details** - Individual user conversation history
+- **Active Sessions** - Real-time user session monitoring
+- **Session Details** - Individual user conversation history
 - **User Actions**:
   - View complete message history
   - Reset user sessions
-  - Block/unblock users
+  - Monitor conversation patterns
   - Export user data
-  - Delete user account
+  - Track user engagement metrics
 
-#### 💬 **Message Management**
+#### 💬 **Message & Conversation Control**
 ```
-/admin/messages
+GET /admin/logs/real-time
 ```
-- **Live Message Feed** - Real-time message monitoring
-- **Message Search** - Search across all conversations
-- **Message Analytics** - Popular queries, response times
+- **Live Message Feed** - Real-time message monitoring with auto-refresh
+- **Message Search** - Search across all conversations with filters
+- **Conversation Analytics** - Popular queries, response times, success rates
 - **Message Actions**:
   - View message details and metadata
-  - Resend failed messages
-  - Moderate content
-  - Export message data
+  - Monitor WhatsApp delivery status
+  - Track agent processing times
+  - Export conversation data
 
-#### 🗄️ **Database Management**
-```
-/admin/database
-```
+#### 🗄️ **Database & Storage Management**
+- **Supabase Integration** - Direct database monitoring
 - **Table Overview** - All database tables and row counts
 - **Data Export** - Export any table to CSV/JSON
-- **Database Health** - Connection status, performance
-- **Database Actions**:
-  - Run custom SQL queries
-  - Backup database
-  - Clean up old data
+- **Database Health** - Connection status, query performance
+- **Storage Actions**:
+  - Monitor database connections
+  - Track query performance
   - View table schemas
+  - Backup and restore data
 
-#### 🔧 **System Configuration**
+#### 🔧 **System Configuration Control**
 ```
-/admin/config
+POST /admin/system/maintenance
 ```
-- **Environment Variables** - View and edit configuration
-- **Feature Toggles** - Enable/disable features
+- **Environment Variables** - View current configuration
 - **Service Settings** - Configure individual services
+- **Maintenance Mode** - Enable/disable services for maintenance
 - **Configuration Actions**:
-  - Update settings without restart
-  - Backup/restore configuration
-  - Test configuration changes
-  - View configuration history
+  - Toggle maintenance mode per service
+  - Monitor service health
+  - Configure alert thresholds
+  - View system architecture
 
-#### 📊 **Analytics & Reports**
+#### 📊 **Analytics & Performance Monitoring**
 ```
-/admin/analytics
+GET /admin/analytics/usage
+GET /admin/performance/metrics
 ```
 - **Usage Statistics** - Daily/weekly/monthly reports
-- **Service Performance** - Success rates by service
-- **Language Analytics** - Language usage patterns
-- **Custom Reports** - Generate specific reports
+- **Service Performance** - Success rates by service (NIRA, URA, NSSF, NLIS)
+- **Language Analytics** - Multi-language usage patterns
+- **Performance Metrics** - Response times, throughput, error rates
 - **Analytics Actions**:
   - Export analytics data
-  - Schedule automated reports
-  - Set up alerts and notifications
-  - View historical trends
+  - Generate custom reports
+  - Monitor trends and patterns
+  - Track KPIs and success metrics
 
-#### 🚨 **Monitoring & Alerts**
+#### 🚨 **Monitoring & Alert System**
 ```
-/admin/monitoring
+GET /admin/alerts
+POST /admin/alerts/{alert_id}/acknowledge
 ```
-- **System Health** - All components status
-- **Error Tracking** - Real-time error monitoring
-- **Performance Monitoring** - Response times, throughput
-- **Alert Management** - Configure notifications
+- **System Health** - All components status with real-time updates
+- **Error Tracking** - Real-time error monitoring and alerting
+- **Performance Monitoring** - Response times, throughput monitoring
+- **Alert Management** - Configure and manage notifications
 - **Monitoring Actions**:
   - Set up custom alerts
+  - Acknowledge and manage alerts
   - View error logs and stack traces
   - Monitor resource usage
-  - Configure notification channels
 
 #### 🔐 **Security & Access Control**
 ```
-/admin/security
+POST /admin/login
+POST /admin/logout
+GET /admin/verify
 ```
-- **Access Logs** - All admin access attempts
-- **Security Settings** - Authentication configuration
-- **API Key Management** - Generate and manage API keys
-- **Security Actions**:
-  - View login attempts
-  - Manage admin users
-  - Configure security policies
-  - Audit security events
+- **Admin Authentication** - JWT-based secure login system
+- **Session Management** - Active admin session tracking
+- **Access Logs** - All admin access attempts and actions
+- **Security Features**:
+  - Secure JWT token authentication
+  - Session timeout management
+  - Login attempt monitoring
+  - Admin activity auditing
 
-#### 🛠️ **System Tools**
+#### 🛠️ **System Control & Maintenance**
 ```
-/admin/tools
+GET /admin/services/health
 ```
-- **Database Tools** - Direct database operations
-- **Cache Management** - Redis cache control
-- **Service Control** - Start/stop/restart services
+- **Service Health Checks** - Monitor all system components
+- **Cache Management** - Redis cache monitoring and control
+- **Agent System Control** - ADK agent status and management
 - **Maintenance Tools**:
-  - Clear caches
-  - Rebuild indexes
-  - Run maintenance scripts
-  - System diagnostics
+  - Monitor ADK agent system
+  - Track MCP server connections
+  - View browser automation status
+  - System diagnostics and health checks
 
-### Admin Dashboard API
+### Admin Dashboard API Endpoints
 
-The dashboard also provides a REST API for programmatic access:
+The dashboard provides a comprehensive REST API for programmatic access:
 
+#### Authentication
 ```bash
-# Get system status
-curl -H "Authorization: Bearer $ADMIN_TOKEN" \
-  https://your-domain.com/admin/api/status
+# Admin login
+curl -X POST https://your-domain.com/admin/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "trevor", "password": "The$1000"}'
 
-# Get user list
+# Verify session
 curl -H "Authorization: Bearer $ADMIN_TOKEN" \
-  https://your-domain.com/admin/api/users
+  https://your-domain.com/admin/verify
 
-# Get analytics data
-curl -H "Authorization: Bearer $ADMIN_TOKEN" \
-  https://your-domain.com/admin/api/analytics?period=7d
-
-# Control services
+# Logout
 curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
-  https://your-domain.com/admin/api/services/restart
+  https://your-domain.com/admin/logout
 ```
+
+#### System Monitoring
+```bash
+# Get dashboard statistics
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  https://your-domain.com/admin/dashboard/stats
+
+# Get real-time logs
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  https://your-domain.com/admin/logs/real-time?limit=50
+
+# Get service health
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  https://your-domain.com/admin/services/health
+
+# Get performance metrics
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  https://your-domain.com/admin/performance/metrics?hours=24
+```
+
+#### Analytics & Reporting
+```bash
+# Get usage analytics
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  https://your-domain.com/admin/analytics/usage?days=7
+
+# Get active user sessions
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  https://your-domain.com/admin/users/sessions?limit=50
+```
+
+#### System Control
+```bash
+# Enable maintenance mode
+curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  https://your-domain.com/admin/system/maintenance \
+  -d '{"service_name": "whatsapp", "enabled": true, "message": "System maintenance in progress"}'
+
+# Get alerts
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  https://your-domain.com/admin/alerts?limit=20
+
+# Acknowledge alert
+curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
+  https://your-domain.com/admin/alerts/alert-id/acknowledge
+```
+
+### Real-time Dashboard Features
+
+#### Live Updates
+- **Auto-refresh every 30 seconds** - Dashboard updates automatically
+- **Real-time indicators** - Live status indicators for all services
+- **WebSocket connections** - Real-time data streaming
+- **Performance monitoring** - Live performance metrics
+
+#### Interactive Controls
+- **Service toggles** - Enable/disable services directly from dashboard
+- **Maintenance mode** - Put individual services in maintenance mode
+- **Alert management** - Acknowledge and manage alerts in real-time
+- **Log filtering** - Filter logs by service, level, and time range
+
+#### Mobile Responsive
+- **Mobile-friendly design** - Works on all devices
+- **Touch-optimized controls** - Easy mobile navigation
+- **Responsive charts** - Charts adapt to screen size
+- **Offline indicators** - Shows when connection is lost
 
 ## 📱 WhatsApp Clone Features
 
