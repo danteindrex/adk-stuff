@@ -138,11 +138,21 @@ async def web_whatsapp_webhook(request: Request, background_tasks: BackgroundTas
         
         # Create or update user if user_data is provided
         if user_data and user_data.get("email"):
-            user = await db.create_or_update_user(user_data)
-            actual_user_id = user.id
+            try:
+                logger.info(f"Attempting to create/update user with data: {user_data}")
+                user = await db.create_or_update_user(user_data)
+                actual_user_id = user.id
+                logger.info(f"Successfully created/updated user: {user.email} with ID: {actual_user_id}")
+            except Exception as user_error:
+                logger.error(f"Failed to create/update user: {str(user_error)}")
+                logger.error(f"User data that failed: {user_data}")
+                # Fall back to using the provided user_id
+                actual_user_id = user_id
+                logger.info(f"Falling back to user_id: {actual_user_id}")
         else:
             # For demo users or users without full data
             actual_user_id = user_id
+            logger.info(f"No user_data provided, using user_id: {actual_user_id}")
         
         # Get or create session
         if not session_id:
@@ -364,14 +374,26 @@ async def create_user(request: Request):
     """Create or update a user"""
     try:
         user_data = await request.json()
+        logger.info(f"Received user creation request: {user_data}")
         
         required_fields = ["email", "name"]
         for field in required_fields:
-            if field not in user_data:
+            if field not in user_data or not user_data[field]:
+                logger.error(f"Missing or empty required field: {field}")
                 raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
         
+        # Validate email format
+        email = user_data["email"]
+        if "@" not in email or "." not in email:
+            logger.error(f"Invalid email format: {email}")
+            raise HTTPException(status_code=400, detail="Invalid email format")
+        
         db = get_supabase_client()
+        logger.info(f"Attempting to create/update user: {email}")
+        
         user = await db.create_or_update_user(user_data)
+        
+        logger.info(f"Successfully created/updated user: {user.email}")
         
         return {
             "user": {
@@ -386,9 +408,23 @@ async def create_user(request: Request):
             },
             "status": "success"
         }
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
-        logger.error(f"Error creating user: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error creating user: {str(e)}")
+        logger.error(f"User data: {user_data if 'user_data' in locals() else 'N/A'}")
+        
+        # Return more specific error information
+        error_detail = str(e)
+        if "duplicate key" in error_detail.lower():
+            error_detail = "User with this email already exists"
+        elif "violates not-null constraint" in error_detail.lower():
+            error_detail = "Missing required user information"
+        elif "connection" in error_detail.lower():
+            error_detail = "Database connection error"
+        
+        raise HTTPException(status_code=500, detail=f"Failed to create user: {error_detail}")
 
 @clone_app.post("/api/session/create")
 async def create_session(request: Request):

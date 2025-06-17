@@ -6,7 +6,7 @@ Handles all database operations for the WhatsApp clone
 import os
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from supabase import create_client, Client
@@ -59,59 +59,112 @@ class SupabaseClient:
         self.supabase_url = os.getenv("SUPABASE_URL")
         self.supabase_key = os.getenv("SUPABASE_ANON_KEY")
         
+        logger.info(f"Initializing Supabase client...")
+        logger.info(f"SUPABASE_URL present: {bool(self.supabase_url)}")
+        logger.info(f"SUPABASE_ANON_KEY present: {bool(self.supabase_key)}")
+        
         if not self.supabase_url or not self.supabase_key:
-            logger.error("Supabase credentials not found in environment variables")
-            raise ValueError("SUPABASE_URL and SUPABASE_ANON_KEY must be set")
+            error_msg = "Supabase credentials missing from environment variables. "
+            if not self.supabase_url:
+                error_msg += "SUPABASE_URL is not set. "
+            if not self.supabase_key:
+                error_msg += "SUPABASE_ANON_KEY is not set. "
+            error_msg += "Please check your .env file."
+            
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        # Validate URL format
+        if not self.supabase_url.startswith(('http://', 'https://')):
+            error_msg = f"Invalid SUPABASE_URL format: {self.supabase_url}. Must start with http:// or https://"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
         
         try:
             self.client: Client = create_client(self.supabase_url, self.supabase_key)
             logger.info("Supabase client initialized successfully")
+            
+            # Test connection
+            try:
+                # Try a simple query to test the connection
+                test_result = self.client.table("whatsapp_users").select("count", count="exact").limit(0).execute()
+                logger.info(f"Supabase connection test successful. Users table accessible.")
+            except Exception as test_error:
+                logger.warning(f"Supabase connection test failed: {test_error}")
+                logger.warning("This might indicate missing tables or incorrect permissions")
+                
         except Exception as e:
             logger.error(f"Failed to initialize Supabase client: {e}")
-            raise
+            logger.error("Please check your Supabase credentials and network connection")
+            raise Exception(f"Supabase initialization failed: {str(e)}")
     
     async def create_or_update_user(self, user_data: Dict) -> User:
         """Create or update user in database"""
         try:
+            logger.info(f"Creating/updating user: {user_data.get('email', 'unknown')}")
+            
+            # Validate required fields
+            if not user_data.get("email") or not user_data.get("name"):
+                raise ValueError("Email and name are required fields")
+            
             # Check if user exists
             existing_user = self.client.table("whatsapp_users").select("*").eq("email", user_data["email"]).execute()
             
+            # Prepare user record with proper data types
             user_record = {
                 "email": user_data["email"],
                 "name": user_data["name"],
-                "avatar_url": user_data.get("picture"),
+                "avatar_url": user_data.get("picture") or user_data.get("avatar_url"),
                 "phone": user_data.get("phone"),
                 "login_method": user_data.get("login_method", "google"),
                 "last_login": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }
             
-            if existing_user.data:
+            # Remove None values to avoid database issues
+            user_record = {k: v for k, v in user_record.items() if v is not None}
+            
+            if existing_user.data and len(existing_user.data) > 0:
                 # Update existing user
+                logger.info(f"Updating existing user: {user_data['email']}")
                 result = self.client.table("whatsapp_users").update(user_record).eq("email", user_data["email"]).execute()
-                user_id = existing_user.data[0]["id"]
-                logger.info(f"Updated existing user: {user_data['email']}")
+                
+                if not result.data or len(result.data) == 0:
+                    # If update didn't return data, fetch the user
+                    result = self.client.table("whatsapp_users").select("*").eq("email", user_data["email"]).execute()
+                
+                user_data_result = result.data[0]
+                logger.info(f"Successfully updated user: {user_data['email']}")
             else:
                 # Create new user
+                logger.info(f"Creating new user: {user_data['email']}")
                 user_record["created_at"] = datetime.now(timezone.utc).isoformat()
+                
                 result = self.client.table("whatsapp_users").insert(user_record).execute()
-                user_id = result.data[0]["id"]
-                logger.info(f"Created new user: {user_data['email']}")
+                
+                if not result.data or len(result.data) == 0:
+                    raise Exception("Failed to create user - no data returned from insert")
+                
+                user_data_result = result.data[0]
+                logger.info(f"Successfully created new user: {user_data['email']}")
             
+            # Create User object from result
             return User(
-                id=user_id,
-                email=user_data["email"],
-                name=user_data["name"],
-                avatar_url=user_data.get("picture"),
-                phone=user_data.get("phone"),
-                created_at=datetime.fromisoformat(result.data[0]["created_at"].replace('Z', '+00:00')),
-                last_login=datetime.now(timezone.utc),
-                login_method=user_data.get("login_method", "google")
+                id=user_data_result["id"],
+                email=user_data_result["email"],
+                name=user_data_result["name"],
+                avatar_url=user_data_result.get("avatar_url"),
+                phone=user_data_result.get("phone"),
+                created_at=datetime.fromisoformat(user_data_result["created_at"].replace('Z', '+00:00')) if user_data_result.get("created_at") else None,
+                last_login=datetime.fromisoformat(user_data_result["last_login"].replace('Z', '+00:00')) if user_data_result.get("last_login") else None,
+                login_method=user_data_result.get("login_method", "google")
             )
             
         except Exception as e:
-            logger.error(f"Error creating/updating user: {e}")
-            raise
+            logger.error(f"Error creating/updating user {user_data.get('email', 'unknown')}: {str(e)}")
+            logger.error(f"User data: {user_data}")
+            # Re-raise with more context
+            raise Exception(f"Failed to create/update user: {str(e)}")
     
     async def get_user_by_id(self, user_id: str) -> Optional[User]:
         """Get user by ID"""
