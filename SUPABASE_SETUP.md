@@ -29,8 +29,6 @@ Add these to your `.env` file:
 
 ```bash
 # Supabase Configuration
-SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_ANON_KEY=your-anon-key-here
 
 # Existing variables...
 TWILIO_ACCOUNT_SID=your_twilio_account_sid
@@ -38,7 +36,7 @@ TWILIO_AUTH_TOKEN=your_twilio_auth_token
 TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
 GOOGLE_CLIENT_ID=your_google_client_id
 ```
-
+The$1000matovu
 ### 4. Create Database Schema
 
 1. In Supabase dashboard, go to **SQL Editor**

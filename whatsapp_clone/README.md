@@ -33,7 +33,7 @@ Add these to your `.env` file:
 
 ```bash
 # Google OAuth
-GOOGLE_CLIENT_ID=your_google_client_id_here
+
 
 # Twilio (already configured in your main app)
 TWILIO_ACCOUNT_SID=your_twilio_account_sid
