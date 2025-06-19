@@ -31,7 +31,7 @@ class WhatsAppWebMessageProcessor:
             self.client = await get_whatsapp_client()
             
             # Import agent orchestrator (avoid circular imports)
-            from app.agents.adk_agents_modular import get_root_agent
+            from app.agents.agent import get_root_agent
             self.agent_orchestrator = await get_root_agent()
             
             # Add message handler to client

@@ -1,12 +1,14 @@
 # Production-optimized Dockerfile with Internal MCP Tools
 FROM python:3.11-slim as builder
 
-# Install system dependencies for building
+# Install system dependencies for building including Node.js
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     curl \
     git \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -19,11 +21,16 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 # Production stage
 FROM python:3.11-slim
 
-# Install runtime dependencies
+# Install runtime dependencies including Node.js
 RUN apt-get update && apt-get install -y \
     curl \
     ca-certificates \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
+
+# Install MCP servers globally
+RUN npm install -g @modelcontextprotocol/server-playwright@latest
 
 # Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser -m appuser

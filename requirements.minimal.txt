@@ -33,4 +33,4 @@ structlog
 
 # Session management (Redis alternative - use in-memory for minimal setup)
 redis
- # Comment out for ultra-minimal setup
+# Comment out for ultra-minimal setup

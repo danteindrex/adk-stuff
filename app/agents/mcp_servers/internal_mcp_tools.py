@@ -32,7 +32,7 @@ async def get_internal_browser_tools():
     def simulate_browser_automation(
         task_description: str,
         url: str,
-        form_data: Dict[str, Any] = None,
+        form_data: Optional[Dict[str, Any]] = None,
         timeout: int = 30,
         tool_context=None
     ) -> dict:
@@ -393,7 +393,7 @@ async def get_whatsapp_tools():
     def format_whatsapp_response(
         message: str,
         message_type: str = "text",
-        buttons: List[Dict] = None,
+        buttons: Optional[List[Dict]] = None,
         tool_context=None
     ) -> dict:
         """Format response for WhatsApp"""
@@ -467,16 +467,214 @@ async def get_whatsapp_tools():
     logger.info(f"Created {len(whatsapp_tools)} WhatsApp tools")
     return whatsapp_tools
 
+async def get_streamlined_portal_tools():
+    """Get streamlined government portal tools (essential only)"""
+    
+    def automate_nira_portal(
+        reference_number: str,
+        action: str = "check_status",
+        tool_context=None
+    ) -> dict:
+        """Automate NIRA portal for birth certificate status"""
+        try:
+            logger.info(f"Processing NIRA request for reference: {reference_number}")
+            
+            if not reference_number or not reference_number.startswith("NIRA/"):
+                return {
+                    "status": "error",
+                    "portal": "NIRA",
+                    "error": "Invalid reference number format. Expected: NIRA/YYYY/NNNNNN"
+                }
+            
+            result = _simulate_nira_response({"reference_number": reference_number})
+            return {
+                "portal": "NIRA",
+                "reference_number": reference_number,
+                "action": action,
+                **result
+            }
+            
+        except Exception as e:
+            return {
+                "status": "error",
+                "portal": "NIRA",
+                "error": str(e)
+            }
+    
+    def automate_ura_portal(
+        tin_number: str,
+        action: str = "check_tax_status",
+        tool_context=None
+    ) -> dict:
+        """Automate URA portal for tax status"""
+        try:
+            logger.info(f"Processing URA request for TIN: {tin_number}")
+            
+            if not tin_number or len(tin_number.replace("-", "")) != 10:
+                return {
+                    "status": "error",
+                    "portal": "URA",
+                    "error": "Invalid TIN format. Expected: 10 digits"
+                }
+            
+            result = _simulate_ura_response({"tin_number": tin_number})
+            return {
+                "portal": "URA",
+                "tin_number": tin_number,
+                "action": action,
+                **result
+            }
+            
+        except Exception as e:
+            return {
+                "status": "error",
+                "portal": "URA",
+                "error": str(e)
+            }
+    
+    def automate_nssf_portal(
+        membership_number: str,
+        action: str = "check_balance",
+        tool_context=None
+    ) -> dict:
+        """Automate NSSF portal for balance check"""
+        try:
+            logger.info(f"Processing NSSF request for membership: {membership_number}")
+            
+            if not membership_number or not (8 <= len(membership_number) <= 12):
+                return {
+                    "status": "error",
+                    "portal": "NSSF",
+                    "error": "Invalid membership number. Expected: 8-12 digits"
+                }
+            
+            result = _simulate_nssf_response({"membership_number": membership_number})
+            return {
+                "portal": "NSSF",
+                "membership_number": membership_number,
+                "action": action,
+                **result
+            }
+            
+        except Exception as e:
+            return {
+                "status": "error",
+                "portal": "NSSF",
+                "error": str(e)
+            }
+    
+    def automate_nlis_portal(
+        plot_number: str = None,
+        gps_coordinates: str = None,
+        action: str = "verify_ownership",
+        tool_context=None
+    ) -> dict:
+        """Automate NLIS portal for land verification"""
+        try:
+            logger.info(f"Processing NLIS request - Plot: {plot_number}, GPS: {gps_coordinates}")
+            
+            if not plot_number and not gps_coordinates:
+                return {
+                    "status": "error",
+                    "portal": "NLIS",
+                    "error": "Either plot_number or gps_coordinates required"
+                }
+            
+            result = _simulate_nlis_response({
+                "plot_number": plot_number,
+                "gps_coordinates": gps_coordinates
+            })
+            return {
+                "portal": "NLIS",
+                "plot_number": plot_number,
+                "gps_coordinates": gps_coordinates,
+                "action": action,
+                **result
+            }
+            
+        except Exception as e:
+            return {
+                "status": "error",
+                "portal": "NLIS",
+                "error": str(e)
+            }
+    
+    portal_tools = [
+        FunctionTool(automate_nira_portal),
+        FunctionTool(automate_ura_portal),
+        FunctionTool(automate_nssf_portal),
+        FunctionTool(automate_nlis_portal)
+    ]
+    
+    logger.info(f"Created {len(portal_tools)} streamlined government portal tools")
+    return portal_tools
+
+async def get_essential_whatsapp_tools():
+    """Get essential WhatsApp tools only"""
+    
+    def validate_phone_number(
+        phone_number: str,
+        country_code: str = "256",
+        tool_context=None
+    ) -> dict:
+        """Validate and normalize Uganda phone number"""
+        try:
+            clean_number = phone_number.replace("whatsapp:", "").replace("+", "").replace("-", "").replace(" ", "")
+            
+            if not clean_number.startswith("256"):
+                if clean_number.startswith("0"):
+                    clean_number = "256" + clean_number[1:]
+                else:
+                    clean_number = "256" + clean_number
+            
+            if len(clean_number) != 12:
+                return {
+                    "status": "error",
+                    "error": "Invalid phone number length",
+                    "original": phone_number
+                }
+            
+            return {
+                "status": "success",
+                "normalized_number": clean_number,
+                "formatted_number": f"+{clean_number}",
+                "original": phone_number,
+                "country_code": country_code
+            }
+            
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e),
+                "original": phone_number
+            }
+    
+    whatsapp_tools = [
+        FunctionTool(validate_phone_number)
+    ]
+    
+    logger.info(f"Created {len(whatsapp_tools)} essential WhatsApp tools")
+    return whatsapp_tools
+
 async def get_all_internal_tools():
-    """Get all internal MCP-like tools"""
-    browser_tools = await get_internal_browser_tools()
-    portal_tools = await get_government_portal_tools()
-    whatsapp_tools = await get_whatsapp_tools()
+    """Get minimal set of core automation tools only - let LLM handle navigation logic"""
+    from .playwright_tools import get_combined_automation_tools
     
-    all_tools = browser_tools + portal_tools + whatsapp_tools
+    # Get core automation tools (Playwright MCP + browser-use fallback)
+    try:
+        automation_tools = await get_combined_automation_tools()
+        logger.info(f"Successfully loaded {len(automation_tools)} automation tools")
+    except Exception as e:
+        logger.error(f"Failed to load automation tools: {e}")
+        automation_tools = []
     
-    logger.info(f"Created {len(all_tools)} total internal tools")
-    return all_tools
+    # Return only the core automation tools - LLM will handle the rest
+    logger.info(f"Created {len(automation_tools)} core automation tools")
+    logger.info(f"  - Playwright MCP tools for reliable web automation")
+    logger.info(f"  - Browser-use AI tools for intelligent fallback")
+    logger.info(f"  - LLM will handle all navigation and service logic")
+    
+    return automation_tools
 
 # Cleanup function (no-op for internal tools)
 async def cleanup_internal_tools():

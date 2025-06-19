@@ -967,8 +967,8 @@ python demo_whatsapp_clone.py
 # 3. Deploy to production
 ./deploy-to-cloudrun.sh
 
-# 4. Access admin dashboard
-open https://your-domain.com/admin
-```
 
+```
+### Architecture Overview
+![E-govt helpdesk](architecture.png)
 **Built with ❤️ for Uganda's digital future**

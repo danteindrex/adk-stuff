@@ -9,6 +9,51 @@ import asyncio
 import logging
 import time
 import json
+"""
+Uganda E-Gov WhatsApp Helpdesk
+Multi-Agent AI System for Government Service Access
+Production-Optimized Version with Modular Architecture and Enhanced Browser Automation
+
+Key Components:
+1. FastAPI Web Framework
+2. Twilio Integration for WhatsApp
+3. OpenTelemetry for Monitoring
+4. ADK Agent System with Browser Automation
+5. Session Management
+6. Rate Limiting
+7. Caching Service
+8. Monitoring Service
+
+Architecture:
+- API Routes:
+  - WhatsApp Webhooks (/webhooks)
+  - Admin Interface (/admin)
+- Services:
+  - Session Management
+  - Cache Service
+  - Monitoring Service
+  - Twilio Client
+- Agent System:
+  - Root Agent Creation
+  - MCP Connection Management
+  - Browser Automation
+  
+Dependencies:
+- FastAPI
+- Twilio
+- OpenTelemetry
+- Google ADK
+- SlowAPI
+- Uvicorn
+- Python-dotenv
+
+Environment Configuration:
+- Uses .env for configuration
+- Structured logging setup
+- CORS and GZip middleware
+- Rate limiting implementation
+"""
+from app.services import twilio_client
 from datetime import datetime
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks, Depends
@@ -25,13 +70,14 @@ from dotenv import load_dotenv
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 # Import our custom modules
+from app.agents.mcp_servers import cleanup_mcp_connections
 from app.core.config import settings
 from app.core.logging_config import setup_logging
 from app.api.webhooks import whatsapp_router
 from app.api.admin import admin_router
 # ADK agent system - using modular architecture with enhanced browser automation
-from app.agents.adk_agents_modular import create_root_agent, cleanup_mcp_connections
-from app.services import twilio_client
+from app.agents.agent import create_root_agent, cleanup_mcp_connections
+
 from app.services.simple_session_manager import session_manager
 from app.services.server_cache_service import cache_service
 from app.services.simple_monitoring import MonitoringService
@@ -41,7 +87,7 @@ from google.adk import Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.events import Event
 from google.genai.types import Content, Part
-
+from google.genai import types 
 # Load environment variables
 load_dotenv()
 
@@ -602,115 +648,257 @@ monitoring_service = None
 root_agent = None
 adk_runner = None
 
+import logging
+from typing import Any, Dict, Optional
+from google.adk.agents import Agent
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService # Assuming this or similar is used
+ # For message formatting
+
+# Assume these are defined globally or passed in during initialization
+# For demonstration, we'll mock them if they're not provided.
+# You should ensure 'adk_runner', 'root_agent', and 'monitoring_service'
+# are properly initialized where this function is called from.
+adk_runner: Optional[Runner] = None
+root_agent: Optional[Agent] = None
+monitoring_service: Any = None # Replace 'Any' with the actual type if known
+
+# Configure basic logging for better output
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+
 async def generate_simple_response(user_text: str, user_id: str) -> str:
     """Generate response using the ADK agent system with intelligent fallback"""
-    
+
     print(f"\n🔄 GENERATE_SIMPLE_RESPONSE CALLED:")
     print(f"   Input text: '{user_text}'")
     print(f"   User ID: '{user_id}'")
-    
+
+    # Normalize user ID (phone number)
+    normalized_user_id = user_id.strip()
+    if not normalized_user_id.startswith("256"):
+        normalized_user_id = f"256{normalized_user_id.lstrip('0')}"
+
+    print(f"   Normalized user ID: '{normalized_user_id}'")
+    logger.info(f"Processing message from {normalized_user_id}: {user_text[:100]}")
+
     try:
-        # Normalize user ID (phone number)
-        normalized_user_id = user_id.replace("whatsapp:", "").replace("+", "")
-        if not normalized_user_id.startswith("256"):
-            normalized_user_id = f"256{normalized_user_id.lstrip('0')}"
-        
-        print(f"   Normalized user ID: '{normalized_user_id}'")
-        
-        logger.info(f"Processing message from {normalized_user_id}: {user_text[:100]}")
-        
+        # --- ENSURE SESSION EXISTS FOR USER ---
+        print(f"\n🔧 ENSURING SESSION EXISTS FOR USER:")
+        try:
+            # Check if user has an active session in our session manager
+            existing_session = await session_manager.get_user_active_session(normalized_user_id)
+            
+            if not existing_session:
+                print(f"   📝 No active session found - creating new session for user")
+                # Create new session for the user
+                session_id = await session_manager.create_session(
+                    user_id=normalized_user_id,
+                    initial_data={
+                        "first_message": user_text,
+                        "created_via": "whatsapp_webhook",
+                        "user_phone": normalized_user_id
+                    }
+                )
+                print(f"   ✅ Created new session: {session_id}")
+                
+                # Log session creation
+                if monitoring_service:
+                    await monitoring_service.log_conversation_event({
+                        "event": "new_session_created",
+                        "user_id": normalized_user_id,
+                        "session_id": session_id,
+                        "trigger": "new_user_message"
+                    })
+            else:
+                print(f"   ✅ Found existing active session: {existing_session['session_id']}")
+                # Update session activity
+                await session_manager.add_message(
+                    existing_session['session_id'], 
+                    "user", 
+                    user_text,
+                    {"timestamp": datetime.now().isoformat()}
+                )
+                
+        except Exception as session_mgr_error:
+            print(f"   ⚠️  Session manager error: {session_mgr_error}")
+            logger.warning(f"Session manager error, continuing with ADK session handling: {session_mgr_error}")
+        # --- End Session Management ---
+
         # Check if ADK components are available
         print(f"\n🔍 CHECKING ADK SYSTEM AVAILABILITY:")
         print(f"   adk_runner available: {adk_runner is not None}")
         print(f"   root_agent available: {root_agent is not None}")
-        
+
         # Primary: Use ADK agent system for intelligent responses
         if adk_runner and root_agent:
             try:
                 print(f"✅ ADK system available - routing to intelligent agent")
                 logger.info("Routing to ADK agent system for intelligent processing")
+
+                # The session_id for a conversation. Often, user_id is sufficient for 1:1 user-session.
+                session_id_to_use = normalized_user_id
                 
-                print(f"🤖 CREATING ADK EVENT:")
+                # --- IMPROVED ADK SESSION HANDLING ---
+                # Always create new session for each interaction to avoid threading issues
+                print(f"   🔧 Creating fresh ADK session for user...")
+                try:
+                    # Create a unique session ID for this interaction
+                    unique_session_id = f"{normalized_user_id}_{int(time.time())}"
+                    
+                    # Create new ADK session
+                    session = await adk_runner.session_service.create_session(
+                        app_name=adk_runner.app_name,
+                        user_id=normalized_user_id,
+                        session_id=unique_session_id,
+                        state={
+                            "username": normalized_user_id, 
+                            "created_at": time.time(),
+                            "interaction_type": "whatsapp_message"
+                        }
+                    )
+                    session_id_to_use = unique_session_id
+                    print(f"   ✅ Created fresh ADK session: {session_id_to_use}")
+                        
+                except Exception as session_error:
+                    print(f"   ❌ ADK session creation failed: {session_error}")
+                    # Try with timestamp-based unique session ID as fallback
+                    fallback_session_id = f"fallback_{normalized_user_id}_{int(time.time() * 1000)}"
+                    print(f"   🔄 Trying with fallback session ID: {fallback_session_id}")
+                    try:
+                        session = await adk_runner.session_service.create_session(
+                            app_name=adk_runner.app_name,
+                            user_id=normalized_user_id,
+                            session_id=fallback_session_id,
+                            state={"username": normalized_user_id, "created_at": time.time()}
+                        )
+                        session_id_to_use = fallback_session_id
+                        print(f"   ✅ Fallback session created: {session_id_to_use}")
+                    except Exception as final_error:
+                        print(f"   ❌ Final session creation failed: {final_error}")
+                        raise final_error
                 
-                # Create event for ADK processing with enhanced context
-                event = Event(
-                    content=Content(parts=[Part(text=user_text)]),
-                    metadata={
-                        "user_id": normalized_user_id, 
-                        "source": "whatsapp",
-                        "timestamp": datetime.now().isoformat(),
-                        "session_type": "whatsapp_conversation"
-                    }
+                # Verify session was created
+                if session is None:
+                    raise ValueError(f"Failed to create ADK session: {session_id_to_use}")
+                # --- End Improved ADK Session Handling ---
+
+
+                print(f"🚀 CALLING ADK RUNNER:")
+                print(f"   User ID: {normalized_user_id}")
+                print(f"   Session ID for run: {session_id_to_use}")
+                print(f"   Session object: {session}")
+                print(f"   ADK Runner app_name: {adk_runner.app_name}")
+
+                # Create the message in a format ADK expects (google.generativeai.types.Content)
+                new_message_content = types.Content(
+                    role='user', parts=[types.Part(text=user_text)]
                 )
-                
-                print(f"   Event created with content: '{user_text}'")
-                print(f"   Event metadata: {event.metadata}")
-                
-                print(f"\n🚀 CALLING ADK RUNNER:")
-                print(f"   Session ID: {normalized_user_id}")
-                
-                # Process with ADK runner - let agents decide the response
-                response = await adk_runner.run(
-                    session_id=normalized_user_id,
-                    event=event
-                )
-                
-                print(f"📥 ADK RUNNER RESPONSE:")
-                print(f"   Response object: {response}")
-                print(f"   Response type: {type(response)}")
-                
-                if response:
-                    print(f"   Has content: {hasattr(response, 'content')}")
-                    if hasattr(response, 'content'):
-                        print(f"   Content: {response.content}")
-                        print(f"   Content type: {type(response.content)}")
+                print(f"   Message content created: {new_message_content}")
+
+                final_response_text = None
+                event_count = 0
+                try:
+                    async for event in adk_runner.run_async(
+                        user_id=normalized_user_id,
+                        session_id=session_id_to_use,
+                        new_message=new_message_content,
+                    ):
+                        event_count += 1
+                        print(f"   Event #{event_count}: {event.__class__.__name__}")
+                        if hasattr(event, 'content') and event.content:
+                            print(f"   Event content: {str(event.content)[:100]}...")
                         
-                        if response.content:
-                            print(f"   Has parts: {hasattr(response.content, 'parts')}")
-                            if hasattr(response.content, 'parts'):
-                                print(f"   Parts: {response.content.parts}")
-                                print(f"   Parts length: {len(response.content.parts) if response.content.parts else 0}")
-                
-                # Extract text from response
-                if response and hasattr(response, 'content') and response.content:
-                    if hasattr(response.content, 'parts') and response.content.parts:
-                        response_text = response.content.parts[0].text
-                        print(f"✅ ADK AGENT RESPONSE EXTRACTED:")
-                        print(f"   Response length: {len(response_text)} characters")
-                        print(f"   Response preview: {response_text[:200]}...")
-                        
-                        logger.info(f"ADK agent response generated successfully: {len(response_text)} chars")
-                        
-                        # Log successful agent processing
-                        if monitoring_service:
-                            await monitoring_service.log_conversation_event({
+                        if event.is_final_response():
+                            if event.content and event.content.parts:
+                                final_response_text = event.content.parts[0].text
+                                print(f"   ✅ Extracted final response text from event #{event_count}")
+                                break
+                            else:
+                                print(f"   ⚠️  Final response event has no content or parts")
+                    
+                    print(f"   📊 Total events processed: {event_count}")
+                except Exception as run_error:
+                    print(f"   ❌ Error during ADK runner execution:")
+                    print(f"   Error: {str(run_error)}")
+                    print(f"   Error type: {type(run_error).__name__}")
+                    
+                    # If it's a session not found error, try the synchronous approach
+                    if "Session not found" in str(run_error):
+                        print(f"   🔄 Trying synchronous runner as fallback...")
+                        try:
+                            # Use the synchronous run method which doesn't have thread issues
+                            events = adk_runner.run(
+                                user_id=normalized_user_id,
+                                session_id=session_id_to_use,
+                                new_message=new_message_content,
+                            )
+                            
+                            # Process events from synchronous run
+                            for event in events:
+                                event_count += 1
+                                print(f"   Sync Event #{event_count}: {event.__class__.__name__}")
+                                if hasattr(event, 'content') and event.content:
+                                    print(f"   Event content: {str(event.content)[:100]}...")
+                                
+                                if event.is_final_response():
+                                    if event.content and event.content.parts:
+                                        final_response_text = event.content.parts[0].text
+                                        print(f"   ✅ Extracted final response text from sync event #{event_count}")
+                                        break
+                                    else:
+                                        print(f"   ⚠️  Final response event has no content or parts")
+                            
+                            print(f"   📊 Total sync events processed: {event_count}")
+                            
+                        except Exception as sync_error:
+                            print(f"   ❌ Synchronous fallback also failed: {sync_error}")
+                            raise run_error  # Raise the original error
+                    else:
+                        raise run_error
+
+                if final_response_text:
+                    print(f"✅ ADK AGENT RESPONSE EXTRACTED:")
+                    print(f"   Response length: {len(final_response_text)} characters")
+                    print(f"   Response preview: {final_response_text[:200]}...")
+
+                    logger.info(
+                        f"ADK agent response generated successfully: {len(final_response_text)} chars"
+                    )
+
+                    if monitoring_service:
+                        await monitoring_service.log_conversation_event(
+                            {
                                 "event": "adk_agent_response",
                                 "user_id": normalized_user_id,
                                 "input_length": len(user_text),
-                                "output_length": len(response_text),
-                                "processing_method": "adk_agents"
-                            })
-                        
-                        return response_text
-                
-                print(f"⚠️  ADK agent returned empty or invalid response")
-                logger.warning("ADK agent returned empty response, using fallback")
-                
+                                "output_length": len(final_response_text),
+                                "processing_method": "adk_agents",
+                            }
+                        )
+                    return final_response_text
+                else:
+                    print(f"⚠️  ADK agent returned no final response with content.")
+                    logger.warning("ADK agent returned empty response, using fallback")
+
             except Exception as e:
                 print(f"❌ ADK AGENT ERROR:")
                 print(f"   Error: {str(e)}")
                 print(f"   Error type: {type(e).__name__}")
-                
+
                 import traceback
                 print(f"   Traceback: {traceback.format_exc()}")
-                
+
                 logger.error(f"ADK agent processing failed: {e}")
                 if monitoring_service:
-                    await monitoring_service.log_error_event("adk_agent_error", str(e), {
-                        "user_id": normalized_user_id,
-                        "input_text": user_text[:100]
-                    })
+                    await monitoring_service.log_error_event(
+                        "adk_agent_error",
+                        str(e),
+                        {"user_id": normalized_user_id, "input_text": user_text[:100]},
+                    )
                 # Continue to fallback
+
         else:
             print(f"⚠️  ADK system not available:")
             if not adk_runner:
@@ -718,26 +906,25 @@ async def generate_simple_response(user_text: str, user_id: str) -> str:
             if not root_agent:
                 print(f"   - root_agent is None")
             logger.warning("ADK agent system not available, using fallback responses")
-        
-        # Fallback: Simple emergency responses when agents are unavailable
+
         print(f"\n🔄 USING FALLBACK RESPONSE SYSTEM")
         logger.info("Using minimal fallback response system")
-        
-        # Log fallback usage for monitoring
+
         if monitoring_service:
-            await monitoring_service.log_conversation_event({
-                "event": "fallback_response_used",
-                "user_id": normalized_user_id,
-                "input_text": user_text[:100],
-                "processing_method": "fallback"
-            })
-        
-        # Minimal fallback - encourage agent system usage
-        fallback_response = f"""🇺🇬 Hello! I'm the Uganda E-Gov assistant.
+            await monitoring_service.log_conversation_event(
+                {
+                    "event": "fallback_response_used",
+                    "user_id": normalized_user_id,
+                    "input_text": user_text[:100],
+                    "processing_method": "fallback",
+                }
+            )
+
+        fallback_response = """🇺🇬 Hello! I'm the Uganda E-Gov assistant.
 
 I can help you with:
 • Birth Certificate (NIRA) - Check status with reference number
-• Tax Status (URA) - Check balance with TIN number  
+• Tax Status (URA) - Check balance with TIN number
 • NSSF Balance - Check contributions with membership number
 • Land Verification (NLIS) - Verify ownership with plot details
 
@@ -755,28 +942,28 @@ How can I assist you today?"""
         print(f"📤 FALLBACK RESPONSE GENERATED:")
         print(f"   Length: {len(fallback_response)} characters")
         print(f"   Preview: {fallback_response[:200]}...")
-        
+
         return fallback_response
 
     except Exception as e:
-        print(f"\n❌ GENERATE_SIMPLE_RESPONSE ERROR:")
+        print(f"\n❌ GENERATE_SIMPLE_RESPONSE TOP-LEVEL ERROR:")
         print(f"   Error: {str(e)}")
         print(f"   Error type: {type(e).__name__}")
-        
+
         import traceback
         print(f"   Traceback: {traceback.format_exc()}")
-        
-        logger.error(f"Error generating response: {e}")
-        
-        error_response = """Hello! I'm the Uganda E-Gov assistant. 
+
+        logger.error(f"Top-level error generating response: {e}")
+
+        error_response = """Hello! I'm the Uganda E-Gov assistant.
 
 I can help you with government services like birth certificates, tax status, NSSF balance, and land verification.
 
 How can I assist you today?"""
 
-        print(f"📤 ERROR RESPONSE GENERATED:")
+        print(f"📤 FINAL ERROR RESPONSE GENERATED:")
         print(f"   Length: {len(error_response)} characters")
-        
+
         return error_response
 
 async def _validate_services():
@@ -840,6 +1027,7 @@ async def lifespan(app: FastAPI):
             print("   Creating ADK session service...")
             adk_session_service = InMemorySessionService()
             print(f"   ✅ Session service created: {adk_session_service}")
+            print(f"   Session service type: {type(adk_session_service)}")
             
             print("   Creating ADK runner...")
             adk_runner = Runner(
@@ -848,6 +1036,38 @@ async def lifespan(app: FastAPI):
                 session_service=adk_session_service
             )
             print(f"   ✅ ADK runner created: {adk_runner}")
+            print(f"   ADK runner app_name: {adk_runner.app_name}")
+            print(f"   ADK runner session_service: {adk_runner.session_service}")
+            print(f"   ADK runner agent: {adk_runner.agent}")
+            
+            # Test session service functionality
+            print("   🧪 Testing session service...")
+            try:
+                test_session_id = "test_session_123"
+                test_user_id = "test_user_123"
+                
+                # Try to create a test session
+                test_session = await adk_runner.session_service.create_session(
+                    app_name=adk_runner.app_name,
+                    user_id=test_user_id,
+                    session_id=test_session_id,
+                    state={"test": True}
+                )
+                print(f"   ✅ Test session created successfully: {test_session}")
+                
+                # Try to get the test session
+                retrieved_session = await adk_runner.session_service.get_session(
+                    app_name=adk_runner.app_name,
+                    user_id=test_user_id,
+                    session_id=test_session_id
+                )
+                print(f"   ✅ Test session retrieved successfully: {retrieved_session}")
+                
+                print("   ✅ Session service test passed!")
+                
+            except Exception as test_error:
+                print(f"   ❌ Session service test failed: {test_error}")
+                print(f"   This may cause issues with ADK runner execution")
             
             init_time = time.time() - start_time
             await monitoring_service.log_conversation_event({"event": "agent_initialization", "duration": init_time, "status": "success"})
@@ -1070,6 +1290,41 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
         print(f"   Message: '{user_text}'")
         print(f"   User ID: '{user_id}'")
         
+        
+        # Ensure session exists for this user before generating response
+        print(f"\n🔧 ENSURING USER SESSION EXISTS:")
+        try:
+            # Check if user has an active session
+            existing_session = await session_manager.get_user_active_session(user_id)
+            
+            if not existing_session:
+                print(f"   📝 Creating new session for WhatsApp user: {user_id}")
+                session_id = await session_manager.create_session(
+                    user_id=user_id,
+                    initial_data={
+                        "first_message": user_text,
+                        "created_via": "whatsapp_webhook",
+                        "source": "whatsapp_business_api",
+                        "user_phone": user_id
+                    }
+                )
+                print(f"   ✅ Created session: {session_id}")
+                
+                # Log new user session creation
+                if monitoring_service:
+                    await monitoring_service.log_conversation_event({
+                        "event": "new_whatsapp_user_session",
+                        "user_id": user_id,
+                        "session_id": session_id,
+                        "first_message": user_text[:100]
+                    })
+            else:
+                print(f"   ✅ Using existing session: {existing_session['session_id']}")
+                
+        except Exception as session_error:
+            print(f"   ⚠️  Session creation error: {session_error}")
+            logger.warning(f"Failed to create session for user {user_id}: {session_error}")
+
         # Generate response with detailed logging
         print(f"\n🤖 GENERATING RESPONSE:")
         print(f"   Calling generate_simple_response...")

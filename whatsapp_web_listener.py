@@ -16,7 +16,7 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 from app.services.whatsapp_web_client import WhatsAppWebClient
-from app.agents.adk_agents_modular import create_root_agent
+from app.agents.agent import create_root_agent
 from app.core.logging_config import setup_logging
 
 # Setup logging

@@ -1,76 +1,105 @@
 """
-Playwright MCP Tools with Browser-Use Agent Fallback
-Enhanced browser automation with intelligent fallback mechanisms
+Playwright MCP Server with Browser-Use Agent Fallback
+Uses actual MCP Playwright server with browser-use as fallback function tool
 """
 
 import logging
 import asyncio
 import json
 from typing import Dict, Any, Optional, List
-from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParameters
+from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioConnectionParams
 from google.adk.tools import FunctionTool
 
 logger = logging.getLogger(__name__)
 
 # Global variables to store toolsets and exit stacks
 _playwright_toolset = None
-_browser_use_toolset = None
 _exit_stacks = []
 
-async def get_playwright_tools():
-    """Get Playwright MCP tools with enhanced error handling"""
+async def get_playwright_mcp_tools():
+    """Get actual Playwright MCP server tools"""
     global _playwright_toolset
     
     if _playwright_toolset is None:
         try:
-            tools, exit_stack = await MCPToolset.from_server(
-                connection_params=StdioServerParameters(
-                    command="npx",
-                    args=[
-                        "-y",
-                        "@microsoft/playwright-mcp@latest"
-                    ]
+            logger.info("Initializing Playwright MCP server...")
+            
+            # Create MCPToolset directly with connection parameters
+
+            # Note: Playwright MCP may not be available in all environments
+            # The system will gracefully fall back to browser-use tools
+            try:
+                playwright_toolset = MCPToolset(
+                    connection_params=StdioConnectionParams(
+                        command="npx",
+                        args=[
+                            "-y", 
+                            "@modelcontextprotocol/server-playwright@latest"
+                        ]
+                    )
                 )
-            )
-            _playwright_toolset = tools
-            _exit_stacks.append(exit_stack)
-            logger.info("Playwright MCP tools initialized successfully")
+            except Exception as mcp_error:
+                logger.warning(f"Playwright MCP initialization failed: {mcp_error}")
+                logger.info("Continuing with browser-use tools only")
+                return []
+            
+            # Store the toolset as a single item list to match expected interface
+            _playwright_toolset = [playwright_toolset]
+            logger.info(f"Playwright MCP server initialized successfully")
+            logger.info(f"Playwright MCP toolset created: {playwright_toolset}")
+                
         except Exception as e:
-            logger.error(f"Failed to initialize Playwright MCP tools: {e}")
-            # Return empty list if MCP server fails
+            logger.error(f"Failed to initialize Playwright MCP server: {e}")
+            logger.warning("Playwright MCP server not available - browser-use fallback will be used")
             _playwright_toolset = []
     
-    return _playwright_toolset
+    return _playwright_toolset if _playwright_toolset else []
 
-async def get_browser_use_tools():
-    """Get Browser-Use agent tools as fallback for Playwright failures"""
+def get_browser_use_fallback_tools():
+    """Get browser-use agent tools as fallback function tools"""
     
     def browser_use_automation(
         task_description: str,
         url: str,
-        actions: List[Dict[str, Any]] = None,
-        timeout: int = 30,
-        tool_context=None
+        max_steps: int = 10,
+        timeout: int = 60,
+        use_vision: bool = True
     ) -> dict:
         """
-        Use Browser-Use agent for web automation when Playwright fails
+        Use Browser-Use agent for AI-powered web automation when Playwright MCP fails
         
         Args:
             task_description: Natural language description of the task
             url: Target URL to automate
-            actions: Optional list of specific actions to perform
+            max_steps: Maximum number of automation steps
             timeout: Timeout in seconds
+            use_vision: Whether to use vision capabilities
+            
+        Returns:
+            Dictionary with automation results
         """
         try:
-            # Import browser-use agent
-            from browser_use import Agent
+            logger.info(f"Using browser-use fallback for: {task_description}")
+            
+            # Try to import browser-use
+            try:
+                from browser_use import Agent
+            except ImportError:
+                logger.error("Browser-Use agent not installed. Install with: pip install browser-use")
+                return {
+                    "status": "error",
+                    "error": "Browser-Use agent not available",
+                    "suggestion": "Install browser-use package: pip install browser-use",
+                    "method": "browser_use_fallback"
+                }
             
             # Create browser-use agent instance
             agent = Agent(
                 task=task_description,
                 llm=None,  # Will use default LLM
-                use_vision=True,
-                save_conversation_path="./browser_use_logs/"
+                use_vision=use_vision,
+                max_steps=max_steps,
+                save_conversation_path="./logs/browser_use/"
             )
             
             # Execute the automation task
@@ -79,125 +108,46 @@ async def get_browser_use_tools():
             return {
                 "status": "success",
                 "result": result,
-                "method": "browser_use",
+                "method": "browser_use_fallback",
                 "task": task_description,
-                "url": url
+                "url": url,
+                "steps_taken": getattr(result, 'steps_taken', 0)
             }
             
-        except ImportError:
-            logger.error("Browser-Use agent not installed. Install with: pip install browser-use")
-            return {
-                "status": "error",
-                "error": "Browser-Use agent not available",
-                "suggestion": "Install browser-use package or use alternative automation"
-            }
         except Exception as e:
             logger.error(f"Browser-Use automation failed: {e}")
             return {
                 "status": "error",
                 "error": str(e),
-                "method": "browser_use"
+                "method": "browser_use_fallback"
             }
     
-    def smart_web_automation(
-        task_description: str,
+    def extract_data_with_browser_use(
         url: str,
-        form_data: Dict[str, Any] = None,
-        expected_elements: List[str] = None,
-        retry_count: int = 3,
-        tool_context=None
+        data_description: str,
+        selectors: Optional[Dict[str, str]] = None
     ) -> dict:
         """
-        Intelligent web automation that tries multiple approaches
-        
-        Args:
-            task_description: What to accomplish
-            url: Target website
-            form_data: Data to fill in forms
-            expected_elements: Elements that should be present
-            retry_count: Number of retry attempts
-        """
-        attempts = []
-        
-        for attempt in range(retry_count):
-            try:
-                # First try: Use Playwright MCP if available
-                if _playwright_toolset and len(_playwright_toolset) > 0:
-                    try:
-                        # This would use the Playwright MCP tools
-                        # For now, we'll simulate the call
-                        playwright_result = _simulate_playwright_call(
-                            task_description, url, form_data, expected_elements
-                        )
-                        
-                        if playwright_result.get("status") == "success":
-                            return {
-                                "status": "success",
-                                "result": playwright_result,
-                                "method": "playwright_mcp",
-                                "attempt": attempt + 1
-                            }
-                        else:
-                            attempts.append(f"Playwright attempt {attempt + 1}: {playwright_result.get('error', 'Unknown error')}")
-                    
-                    except Exception as e:
-                        attempts.append(f"Playwright attempt {attempt + 1}: {str(e)}")
-                
-                # Second try: Use Browser-Use agent
-                browser_use_result = browser_use_automation(
-                    task_description=task_description,
-                    url=url,
-                    timeout=30
-                )
-                
-                if browser_use_result.get("status") == "success":
-                    return {
-                        "status": "success",
-                        "result": browser_use_result,
-                        "method": "browser_use_fallback",
-                        "attempt": attempt + 1,
-                        "previous_attempts": attempts
-                    }
-                else:
-                    attempts.append(f"Browser-Use attempt {attempt + 1}: {browser_use_result.get('error', 'Unknown error')}")
-                
-                # Wait before retry
-                if attempt < retry_count - 1:
-                    import time
-                    time.sleep(2 ** attempt)  # Exponential backoff
-                    
-            except Exception as e:
-                attempts.append(f"Attempt {attempt + 1}: {str(e)}")
-        
-        return {
-            "status": "error",
-            "error": "All automation methods failed",
-            "attempts": attempts,
-            "suggestion": "Check website availability and automation parameters"
-        }
-    
-    def extract_web_data(
-        url: str,
-        selectors: Dict[str, str],
-        wait_for_element: str = None,
-        tool_context=None
-    ) -> dict:
-        """
-        Extract data from web pages using multiple methods
+        Extract data from web pages using AI-powered automation
         
         Args:
             url: Target URL
-            selectors: CSS selectors for data extraction
-            wait_for_element: Element to wait for before extraction
+            data_description: Description of what data to extract
+            selectors: Optional CSS selectors as hints
+            
+        Returns:
+            Dictionary with extracted data
         """
         try:
-            # Try Browser-Use for data extraction
-            task_description = f"Extract data from {url} using selectors: {selectors}"
+            task_description = f"Extract {data_description} from {url}"
+            if selectors:
+                task_description += f" using these selectors as hints: {selectors}"
             
             result = browser_use_automation(
                 task_description=task_description,
                 url=url,
-                timeout=20
+                max_steps=5,
+                timeout=30
             )
             
             if result.get("status") == "success":
@@ -205,99 +155,149 @@ async def get_browser_use_tools():
                     "status": "success",
                     "data": result.get("result"),
                     "method": "browser_use_extraction",
-                    "selectors": selectors
+                    "data_description": data_description
                 }
             else:
-                return {
-                    "status": "error",
-                    "error": result.get("error"),
-                    "method": "extraction_failed"
-                }
+                return result
                 
         except Exception as e:
-            logger.error(f"Data extraction failed: {e}")
+            logger.error(f"AI data extraction failed: {e}")
             return {
                 "status": "error",
-                "error": str(e)
+                "error": str(e),
+                "method": "browser_use_extraction"
             }
     
-    def take_screenshot(
+    def fill_form_with_browser_use(
         url: str,
-        element_selector: str = None,
-        full_page: bool = False,
-        tool_context=None
+        form_data: Dict[str, Any],
+        submit: bool = True
     ) -> dict:
         """
-        Take screenshot of web page or specific element
+        Fill web forms using AI-powered automation
         
         Args:
-            url: Target URL
-            element_selector: CSS selector for specific element
-            full_page: Whether to capture full page
+            url: Target URL with the form
+            form_data: Data to fill in the form
+            submit: Whether to submit the form after filling
+            
+        Returns:
+            Dictionary with form filling results
         """
         try:
-            task_description = f"Take screenshot of {url}"
-            if element_selector:
-                task_description += f" focusing on element: {element_selector}"
-            if full_page:
-                task_description += " (full page)"
+            task_description = f"Fill the form at {url} with the following data: {form_data}"
+            if submit:
+                task_description += " and submit the form"
             
             result = browser_use_automation(
                 task_description=task_description,
                 url=url,
-                timeout=15
+                max_steps=15,
+                timeout=45
             )
             
             return {
-                "status": "success" if result.get("status") == "success" else "error",
-                "screenshot_path": result.get("result", {}).get("screenshot_path"),
-                "method": "browser_use_screenshot",
+                "status": result.get("status"),
+                "result": result.get("result"),
+                "method": "browser_use_form_filling",
+                "form_data": form_data,
+                "submitted": submit,
                 "error": result.get("error")
             }
             
         except Exception as e:
-            logger.error(f"Screenshot failed: {e}")
+            logger.error(f"AI form filling failed: {e}")
             return {
                 "status": "error",
-                "error": str(e)
+                "error": str(e),
+                "method": "browser_use_form_filling"
             }
     
-    # Create function tools
-    browser_tools = [
+    def take_screenshot_with_browser_use(
+        url: str,
+        context_description: Optional[str] = None,
+        element_description: Optional[str] = None
+    ) -> dict:
+        """
+        Take contextual screenshots using AI
+        
+        Args:
+            url: Target URL
+            context_description: Description of what to focus on
+            element_description: Specific element to screenshot
+            
+        Returns:
+            Dictionary with screenshot information
+        """
+        try:
+            task_description = f"Take a screenshot of {url}"
+            if context_description:
+                task_description += f" focusing on {context_description}"
+            if element_description:
+                task_description += f" specifically the {element_description}"
+            
+            result = browser_use_automation(
+                task_description=task_description,
+                url=url,
+                max_steps=3,
+                timeout=20
+            )
+            
+            return {
+                "status": result.get("status"),
+                "screenshot_info": result.get("result"),
+                "method": "browser_use_screenshot",
+                "context": context_description,
+                "error": result.get("error")
+            }
+            
+        except Exception as e:
+            logger.error(f"AI screenshot failed: {e}")
+            return {
+                "status": "error",
+                "error": str(e),
+                "method": "browser_use_screenshot"
+            }
+    
+    # Create Browser-Use fallback tools as FunctionTools
+    browser_use_tools = [
         FunctionTool(browser_use_automation),
-        FunctionTool(smart_web_automation),
-        FunctionTool(extract_web_data),
-        FunctionTool(take_screenshot)
+        FunctionTool(extract_data_with_browser_use),
+        FunctionTool(fill_form_with_browser_use),
+        FunctionTool(take_screenshot_with_browser_use)
     ]
     
-    logger.info(f"Created {len(browser_tools)} Browser-Use tools")
-    return browser_tools
+    logger.info(f"Created {len(browser_use_tools)} Browser-Use fallback tools")
+    return browser_use_tools
 
-def _simulate_playwright_call(task_description: str, url: str, form_data: Dict = None, expected_elements: List = None) -> dict:
-    """
-    Simulate Playwright MCP call (replace with actual MCP tool call)
-    This is a placeholder for the actual Playwright MCP integration
-    """
-    # In a real implementation, this would call the Playwright MCP tools
-    # For now, we'll simulate a failure to trigger the Browser-Use fallback
-    return {
-        "status": "error",
-        "error": "Playwright MCP simulation - triggering fallback"
-    }
-
-async def get_enhanced_automation_tools():
-    """Get combined Playwright and Browser-Use tools"""
-    playwright_tools = await get_playwright_tools()
-    browser_use_tools = await get_browser_use_tools()
-    
-    # Combine both toolsets
-    all_tools = []
-    if playwright_tools:
-        all_tools.extend(playwright_tools)
-    all_tools.extend(browser_use_tools)
-    
-    logger.info(f"Created {len(all_tools)} total automation tools")
-    return all_tools
+async def get_combined_automation_tools():
+    """Get combined Playwright MCP tools with browser-use fallbacks"""
+    try:
+        # First try to get Playwright MCP tools
+        playwright_tools = await get_playwright_mcp_tools()
+        
+        # Always get browser-use fallback tools
+        browser_use_tools = get_browser_use_fallback_tools()
+        
+        # Combine both toolsets
+        all_tools = []
+        
+        if playwright_tools:
+            all_tools.extend(playwright_tools)
+            logger.info(f"Added {len(playwright_tools)} Playwright MCP tools")
+        else:
+            logger.warning("No Playwright MCP tools available")
+        
+        all_tools.extend(browser_use_tools)
+        logger.info(f"Added {len(browser_use_tools)} browser-use fallback tools")
+        
+        logger.info(f"Total automation tools available: {len(all_tools)}")
+        return all_tools
+        
+    except Exception as e:
+        logger.error(f"Error getting combined automation tools: {e}")
+        # Return just browser-use tools as fallback
+        return get_browser_use_fallback_tools()
 
 # Government portal specific automation functions
 async def get_government_portal_tools():
@@ -305,31 +305,40 @@ async def get_government_portal_tools():
     
     def automate_nira_portal(
         reference_number: str,
-        action: str = "check_status",
-        tool_context=None
+        action: str = "check_status"
     ) -> dict:
-        """Automate NIRA (National Identification and Registration Authority) portal"""
+        """
+        Automate NIRA (National Identification and Registration Authority) portal
+        
+        Args:
+            reference_number: NIRA reference number (format: NIRA/YYYY/NNNNNN)
+            action: Action to perform (default: check_status)
+            
+        Returns:
+            Dictionary with portal automation results
+        """
         try:
             nira_url = "https://www.nira.go.ug"
             task_description = f"Check birth certificate status for reference: {reference_number}"
             
-            # Use smart automation with NIRA-specific parameters
-            result = smart_web_automation(
+            # Use browser-use automation for NIRA portal
+            result = browser_use_automation(
                 task_description=task_description,
                 url=nira_url,
-                form_data={"reference_number": reference_number},
-                expected_elements=["#status-result", ".certificate-info"],
-                retry_count=3
+                max_steps=10,
+                timeout=60
             )
             
             return {
                 "portal": "NIRA",
                 "reference_number": reference_number,
                 "action": action,
-                **result
+                "automation_result": result,
+                "method": "government_portal_automation"
             }
             
         except Exception as e:
+            logger.error(f"NIRA portal automation failed: {e}")
             return {
                 "status": "error",
                 "portal": "NIRA",
@@ -338,30 +347,39 @@ async def get_government_portal_tools():
     
     def automate_ura_portal(
         tin_number: str,
-        action: str = "check_tax_status",
-        tool_context=None
+        action: str = "check_tax_status"
     ) -> dict:
-        """Automate URA (Uganda Revenue Authority) portal"""
+        """
+        Automate URA (Uganda Revenue Authority) portal
+        
+        Args:
+            tin_number: Tax Identification Number (10 digits)
+            action: Action to perform (default: check_tax_status)
+            
+        Returns:
+            Dictionary with portal automation results
+        """
         try:
             ura_url = "https://www.ura.go.ug"
             task_description = f"Check tax status for TIN: {tin_number}"
             
-            result = smart_web_automation(
+            result = browser_use_automation(
                 task_description=task_description,
                 url=ura_url,
-                form_data={"tin_number": tin_number},
-                expected_elements=["#tax-status", ".payment-info"],
-                retry_count=3
+                max_steps=10,
+                timeout=60
             )
             
             return {
                 "portal": "URA",
                 "tin_number": tin_number,
                 "action": action,
-                **result
+                "automation_result": result,
+                "method": "government_portal_automation"
             }
             
         except Exception as e:
+            logger.error(f"URA portal automation failed: {e}")
             return {
                 "status": "error",
                 "portal": "URA",
@@ -370,30 +388,39 @@ async def get_government_portal_tools():
     
     def automate_nssf_portal(
         membership_number: str,
-        action: str = "check_balance",
-        tool_context=None
+        action: str = "check_balance"
     ) -> dict:
-        """Automate NSSF (National Social Security Fund) portal"""
+        """
+        Automate NSSF (National Social Security Fund) portal
+        
+        Args:
+            membership_number: NSSF membership number (8-12 digits)
+            action: Action to perform (default: check_balance)
+            
+        Returns:
+            Dictionary with portal automation results
+        """
         try:
             nssf_url = "https://www.nssfug.org"
             task_description = f"Check NSSF balance for membership: {membership_number}"
             
-            result = smart_web_automation(
+            result = browser_use_automation(
                 task_description=task_description,
                 url=nssf_url,
-                form_data={"membership_number": membership_number},
-                expected_elements=["#balance-info", ".contribution-history"],
-                retry_count=3
+                max_steps=10,
+                timeout=60
             )
             
             return {
                 "portal": "NSSF",
                 "membership_number": membership_number,
                 "action": action,
-                **result
+                "automation_result": result,
+                "method": "government_portal_automation"
             }
             
         except Exception as e:
+            logger.error(f"NSSF portal automation failed: {e}")
             return {
                 "status": "error",
                 "portal": "NSSF",
@@ -401,21 +428,28 @@ async def get_government_portal_tools():
             }
     
     def automate_nlis_portal(
-        plot_number: str = None,
-        gps_coordinates: str = None,
-        action: str = "verify_ownership",
-        tool_context=None
+        plot_number: Optional[str] = None,
+        gps_coordinates: Optional[str] = None,
+        action: str = "verify_ownership"
     ) -> dict:
-        """Automate NLIS (National Land Information System) portal"""
+        """
+        Automate NLIS (National Land Information System) portal
+        
+        Args:
+            plot_number: Plot number for land verification
+            gps_coordinates: GPS coordinates for land verification
+            action: Action to perform (default: verify_ownership)
+            
+        Returns:
+            Dictionary with portal automation results
+        """
         try:
             nlis_url = "https://nlis.go.ug"
             
             if plot_number:
                 task_description = f"Verify land ownership for plot: {plot_number}"
-                form_data = {"plot_number": plot_number}
             elif gps_coordinates:
                 task_description = f"Verify land ownership for coordinates: {gps_coordinates}"
-                form_data = {"gps_coordinates": gps_coordinates}
             else:
                 return {
                     "status": "error",
@@ -423,12 +457,11 @@ async def get_government_portal_tools():
                     "error": "Either plot_number or gps_coordinates required"
                 }
             
-            result = smart_web_automation(
+            result = browser_use_automation(
                 task_description=task_description,
                 url=nlis_url,
-                form_data=form_data,
-                expected_elements=["#ownership-info", ".land-details"],
-                retry_count=3
+                max_steps=10,
+                timeout=60
             )
             
             return {
@@ -436,17 +469,19 @@ async def get_government_portal_tools():
                 "plot_number": plot_number,
                 "gps_coordinates": gps_coordinates,
                 "action": action,
-                **result
+                "automation_result": result,
+                "method": "government_portal_automation"
             }
             
         except Exception as e:
+            logger.error(f"NLIS portal automation failed: {e}")
             return {
                 "status": "error",
                 "portal": "NLIS",
                 "error": str(e)
             }
     
-    # Create government portal tools
+    # Create government portal tools as FunctionTools
     portal_tools = [
         FunctionTool(automate_nira_portal),
         FunctionTool(automate_ura_portal),
@@ -459,7 +494,7 @@ async def get_government_portal_tools():
 
 async def cleanup_playwright():
     """Clean up Playwright MCP connections and resources"""
-    global _playwright_toolset, _browser_use_toolset, _exit_stacks
+    global _playwright_toolset, _exit_stacks
     
     try:
         # Clean up exit stacks
@@ -471,7 +506,6 @@ async def cleanup_playwright():
         
         # Reset global variables
         _playwright_toolset = None
-        _browser_use_toolset = None
         _exit_stacks.clear()
         
         logger.info("Playwright MCP connections cleaned up successfully")
@@ -479,13 +513,35 @@ async def cleanup_playwright():
     except Exception as e:
         logger.error(f"Error during Playwright cleanup: {e}")
 
-# Import the smart_web_automation function to make it available globally
-def smart_web_automation(task_description: str, url: str, form_data: Dict[str, Any] = None, expected_elements: List[str] = None, retry_count: int = 3) -> dict:
-    """Global access to smart web automation"""
-    browser_tools = asyncio.run(get_browser_use_tools())
-    # Find the smart_web_automation tool and call it
-    for tool in browser_tools:
-        if tool.func.__name__ == 'smart_web_automation':
-            return tool.func(task_description, url, form_data, expected_elements, retry_count)
-    
-    return {"status": "error", "error": "Smart web automation tool not found"}
+# Helper function for browser-use automation (used by government portal tools)
+def browser_use_automation(task_description: str, url: str, max_steps: int = 10, timeout: int = 60) -> dict:
+    """Helper function for browser-use automation"""
+    try:
+        from browser_use import Agent
+        
+        agent = Agent(
+            task=task_description,
+            llm=None,
+            use_vision=True,
+            max_steps=max_steps,
+            save_conversation_path="./logs/browser_use/"
+        )
+        
+        result = agent.run(url)
+        
+        return {
+            "status": "success",
+            "result": result,
+            "method": "browser_use_helper"
+        }
+        
+    except ImportError:
+        return {
+            "status": "error",
+            "error": "Browser-Use agent not available"
+        }
+    except Exception as e:
+        return {
+            "status": "error", 
+            "error": str(e)
+        }
