@@ -55,7 +55,6 @@ This production-ready full-stack application provides:
 
 ```bash
 # Clone the repository
-git clone <your-repository-url>
 cd adk-stuff
 
 # Make scripts executable
@@ -312,10 +311,6 @@ The admin dashboard provides comprehensive control over the entire application w
 ```
 https://your-domain.com/admin
 ```
-
-**Default Admin Credentials:**
-- Username: `trevor`
-- Password: `The$1000`
 
 ### Dashboard Features
 
