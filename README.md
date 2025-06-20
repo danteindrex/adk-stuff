@@ -124,7 +124,6 @@ This project was developed for the Google ADK Hackathon 2025 and uses a WhatsApp
 
 ```bash
 # Clone the repository
-
 cd adk-stuff
 
 # Make scripts executable
@@ -381,10 +380,6 @@ The admin dashboard provides comprehensive control over the entire application w
 ```
 https://your-domain.com/admin
 ```
-
-**Default Admin Credentials:**
-- Username: `trevor`
-- Password: `The$1000`
 
 ### Dashboard Features
 
