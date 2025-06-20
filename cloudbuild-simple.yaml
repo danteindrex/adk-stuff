@@ -1,12 +1,11 @@
-# Google Cloud Build configuration for Uganda E-Gov WhatsApp Helpdesk
+# Simplified Cloud Build configuration for testing
 steps:
   # Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build',
-      '-f', 'Dockerfile.cloudrun',
+      '-f', 'Dockerfile.optimized',
       '-t', 'gcr.io/$PROJECT_ID/uganda-egov-whatsapp:$BUILD_ID',
-      '-t', 'gcr.io/$PROJECT_ID/uganda-egov-whatsapp:latest',
       '.'
     ]
 
@@ -14,10 +13,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/uganda-egov-whatsapp:$BUILD_ID']
 
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/uganda-egov-whatsapp:latest']
-
-  # Deploy to Cloud Run
+  # Deploy to Cloud Run (simplified)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args: [
@@ -26,20 +22,12 @@ steps:
       '--region', 'us-central1',
       '--platform', 'managed',
       '--allow-unauthenticated',
-      '--memory', '2Gi',
-      '--cpu', '2',
-      '--concurrency', '100',
-      '--max-instances', '5',
-      '--min-instances', '1',
-      '--timeout', '300',
-      '--port', '8080',
-      '--set-env-vars', 'ENVIRONMENT=production,PORT_NO=8080'
+      '--port', '8080'
     ]
 
 # Store build artifacts
 images:
   - 'gcr.io/$PROJECT_ID/uganda-egov-whatsapp:$BUILD_ID'
-  - 'gcr.io/$PROJECT_ID/uganda-egov-whatsapp:latest'
 
 # Build options
 options:

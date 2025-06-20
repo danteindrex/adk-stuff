@@ -7,6 +7,10 @@ pydantic-settings
 python-multipart
 aiohttp
 python-dotenv
+opentelemetry-instrumentation
+opentelemetry-instrumentation-fastapi
+opentelemetry-exporter-otlp
+opentelemetry-sdk
 
 # Security and encryption
 PyJWT
@@ -14,7 +18,7 @@ passlib[bcrypt]
 
 # Google ADK for multi-agent system
 google-adk
-
+langchain_google_genai
 # Communication
 twilio
 
@@ -30,6 +34,7 @@ slowapi
 
 # Logging
 structlog
+python-json-logger
 
 # Session management (Redis alternative - use in-memory for minimal setup)
 redis

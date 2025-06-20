@@ -2,7 +2,15 @@
 Browser-Use MCP Tools
 AI-powered browser automation using browser-use agent
 """
+from langchain_google_genai import ChatGoogleGenerativeAI
+from browser_use import Agent
+from dotenv import load_dotenv
 
+# Read GOOGLE_API_KEY into env
+load_dotenv()
+
+# Initialize the model
+llm = ChatGoogleGenerativeAI(model='gemini-2.0-flash-exp')
 import logging
 import asyncio
 import json
@@ -38,7 +46,7 @@ async def get_browser_tools():
             # Create browser-use agent instance
             agent = Agent(
                 task=task_description,
-                llm=None,  # Will use default LLM
+                llm=llm,  # Will use default LLM
                 use_vision=use_vision,
                 max_steps=max_steps,
                 save_conversation_path="./logs/browser_use/"
@@ -406,7 +414,7 @@ def automate_government_portal(portal_name: str, portal_url: str, service_type: 
         
         agent = Agent(
             task=task_description,
-            llm=None,
+            llm=llm,
             use_vision=True,
             max_steps=20,
             save_conversation_path="./logs/browser_use/"

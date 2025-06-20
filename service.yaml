@@ -1,0 +1,84 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: uganda-egov-whatsapp
+  annotations:
+    run.googleapis.com/ingress: all
+    run.googleapis.com/execution-environment: gen2
+spec:
+  template:
+    metadata:
+      annotations:
+        # Resource allocation
+        run.googleapis.com/memory: "2Gi"
+        run.googleapis.com/cpu: "2"
+        
+        # Scaling configuration
+        autoscaling.knative.dev/maxScale: "10"
+        autoscaling.knative.dev/minScale: "1"
+        
+        # Timeout configuration
+        run.googleapis.com/timeout: "300s"
+        
+        # Concurrency
+        run.googleapis.com/execution-environment: gen2
+        
+        # VPC connector (if using Redis Memorystore)
+        # run.googleapis.com/vpc-access-connector: projects/PROJECT_ID/locations/REGION/connectors/CONNECTOR_NAME
+        
+    spec:
+      containerConcurrency: 100
+      timeoutSeconds: 300
+      containers:
+      - image: gcr.io/PROJECT_ID/uganda-egov-whatsapp:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: PORT_NO
+          value: "8080"
+        - name: GOOGLE_GENAI_USE_VERTEXAI
+          value: "TRUE"
+        
+        # Mount secrets as environment variables
+        envFrom:
+        - secretRef:
+            name: uganda-egov-secrets
+        
+        resources:
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+          requests:
+            memory: "1Gi"
+            cpu: "1000m"
+        
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        # Startup probe for slower startup
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
