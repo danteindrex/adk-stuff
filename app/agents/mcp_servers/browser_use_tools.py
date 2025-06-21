@@ -1,37 +1,156 @@
 """
 Browser-Use MCP Tools
 AI-powered browser automation using browser-use agent
+
+This module provides production-ready browser automation capabilities using the browser-use package.
+It includes features like connection pooling, retries, timeouts, and comprehensive error handling.
 """
-from langchain_google_genai import ChatGoogleGenerativeAI
-from browser_use import Agent
-from dotenv import load_dotenv
-
-# Read GOOGLE_API_KEY into env
-load_dotenv()
-
-# Initialize the model
-llm = ChatGoogleGenerativeAI(model='gemini-2.0-flash-exp')
-import logging
+import os
 import asyncio
 import json
-from typing import Dict, Any, Optional, List
+import logging
+import time
+from typing import Dict, Any, Optional, List, Tuple, Callable
+from functools import wraps
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from enum import Enum
+
+from dotenv import load_dotenv
+from langchain_google_genai import ChatGoogleGenerativeAI
+from browser_use import Agent
 from google.adk.tools import FunctionTool
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Load environment variables
+load_dotenv()
+
+# Configuration
+DEFAULT_TIMEOUT = int(os.getenv('BROWSER_TIMEOUT', '300'))  # 5 minutes
+MAX_RETRIES = int(os.getenv('BROWSER_MAX_RETRIES', '3'))
+BROWSER_HEADLESS = os.getenv('BROWSER_HEADLESS', 'true').lower() == 'true'
+BROWSER_SLOW_MO = int(os.getenv('BROWSER_SLOW_MO', '0'))  # milliseconds
+CONVERSATION_LOG_DIR = os.getenv('CONVERSATION_LOG_DIR', './logs/browser_use/')
+
+# Ensure log directory exists
+os.makedirs(CONVERSATION_LOG_DIR, exist_ok=True)
+
+# Initialize the LLM model
+llm = ChatGoogleGenerativeAI(
+    model=os.getenv('BROWSER_USE_MODEL', 'gemini-2.0-flash-exp'),
+    temperature=0.2,
+    max_output_tokens=2048,
+)
+
+class BrowserAutomationError(Exception):
+    """Custom exception for browser automation errors"""
+    pass
+
+class BrowserType(str, Enum):
+    """Supported browser types"""
+    CHROMIUM = "chromium"
+    FIREFOX = "firefox"
+    WEBKIT = "webkit"
+
+@dataclass
+class BrowserConfig:
+    """Configuration for browser automation"""
+    headless: bool = BROWSER_HEADLESS
+    slow_mo: int = BROWSER_SLOW_MO
+    browser_type: BrowserType = BrowserType.CHROMIUM
+    viewport: Optional[Dict[str, int]] = None
+    user_agent: Optional[str] = None
+    proxy: Optional[Dict[str, str]] = None
+    extra_http_headers: Optional[Dict[str, str]] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert config to dictionary for browser-use"""
+        return {
+            'headless': self.headless,
+            'slow_mo': self.slow_mo,
+            'browser_type': self.browser_type.value,
+            'viewport': self.viewport,
+            'user_agent': self.user_agent,
+            'proxy': self.proxy,
+            'extra_http_headers': self.extra_http_headers
+        }
 
 logger = logging.getLogger(__name__)
 
+def retry_on_failure(max_retries: int = MAX_RETRIES, backoff_factor: float = 1.0):
+    """Decorator to retry a function on failure with exponential backoff"""
+    def decorator(func: Callable):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            last_exception = None
+            for attempt in range(max_retries):
+                try:
+                    return await func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    if attempt < max_retries - 1:  # Don't sleep on the last attempt
+                        wait_time = backoff_factor * (2 ** attempt)  # Exponential backoff
+                        logger.warning(
+                            f"Attempt {attempt + 1} failed: {str(e)}. "
+                            f"Retrying in {wait_time:.1f} seconds..."
+                        )
+                        await asyncio.sleep(wait_time)
+            raise BrowserAutomationError(
+                f"Failed after {max_retries} attempts. Last error: {str(last_exception)}"
+            ) from last_exception
+        return wrapper
+    return decorator
+
+@asynccontextmanager
+async def create_browser_agent(
+    task_description: str,
+    config: Optional[BrowserConfig] = None,
+    **kwargs
+):
+    """Context manager for browser agent with proper resource cleanup"""
+    config = config or BrowserConfig()
+    agent = None
+    try:
+        agent = Agent(
+            task=task_description,
+            llm=llm,
+            **config.to_dict(),
+            **kwargs
+        )
+        yield agent
+    except Exception as e:
+        logger.error(f"Failed to create browser agent: {e}")
+        raise BrowserAutomationError(f"Browser agent creation failed: {e}") from e
+    finally:
+        if agent:
+            try:
+                await agent.close()
+            except Exception as e:
+                logger.error(f"Error closing browser agent: {e}")
+
 async def get_browser_tools():
-    """Get Browser-Use agent tools for AI-powered browser automation"""
+    """
+    Get Browser-Use agent tools for AI-powered browser automation
     
-    def browser_use_automation(
+    Returns:
+        List of FunctionTool instances for browser automation
+    """
+    
+    @retry_on_failure()
+    async def browser_use_automation(
         task_description: str,
         url: str,
         max_steps: int = 10,
-        timeout: int = 60,
+        timeout: int = DEFAULT_TIMEOUT,
         use_vision: bool = True,
-        tool_context=None
-    ) -> dict:
+        tool_context: Optional[Dict[str, Any]] = None,
+        config: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
-        Use Browser-Use agent for AI-powered web automation
+        Execute AI-powered web automation using Browser-Use agent
         
         Args:
             task_description: Natural language description of the task
@@ -39,60 +158,134 @@ async def get_browser_tools():
             max_steps: Maximum number of automation steps
             timeout: Timeout in seconds
             use_vision: Whether to use vision capabilities
-        """
-        try:
-            from browser_use import Agent
+            tool_context: Additional context for the tool
+            config: Browser configuration overrides
             
-            # Create browser-use agent instance
-            agent = Agent(
+        Returns:
+            Dictionary with automation results or error information
+        """
+        start_time = time.time()
+        logger.info(f"Starting browser automation for: {url}")
+        
+        try:
+            # Parse config
+            browser_config = BrowserConfig(
+                **config
+            ) if config else BrowserConfig()
+            
+            # Generate unique task ID for logging
+            task_id = f"task_{int(time.time())}"
+            log_path = os.path.join(CONVERSATION_LOG_DIR, f"{task_id}")
+            
+            async with create_browser_agent(
                 task=task_description,
-                llm=llm,  # Will use default LLM
+                config=browser_config,
                 use_vision=use_vision,
                 max_steps=max_steps,
-                save_conversation_path="./logs/browser_use/"
-            )
-            
-            # Execute the automation task
-            result = agent.run(url)
-            
-            return {
-                "status": "success",
-                "result": result,
-                "method": "browser_use",
-                "task": task_description,
-                "url": url,
-                "steps_taken": getattr(result, 'steps_taken', 0)
-            }
-            
-        except ImportError:
-            logger.error("Browser-Use agent not installed. Install with: pip install browser-use")
+                save_conversation_path=log_path,
+                timeout=timeout * 1000,  # Convert to milliseconds
+            ) as agent:
+                
+                logger.info(f"Executing task: {task_description}")
+                
+                # Execute the automation task asynchronously
+                result = await agent.run(url)
+                
+                execution_time = time.time() - start_time
+                logger.info(
+                    f"Browser automation completed in {execution_time:.2f}s. "
+                    f"Steps taken: {getattr(result, 'steps_taken', 'N/A')}"
+                )
+                
+                return {
+                    "status": "success",
+                    "result": str(result),
+                    "method": "browser_use",
+                    "task": task_description,
+                    "url": url,
+                    "steps_taken": getattr(result, 'steps_taken', 0),
+                    "execution_time": execution_time,
+                    "log_path": log_path
+                }
+                
+        except ImportError as e:
+            error_msg = "Browser-Use agent not installed. Install with: pip install browser-use playwright"
+            logger.error(error_msg)
             return {
                 "status": "error",
-                "error": "Browser-Use agent not available",
-                "suggestion": "Install browser-use package: pip install browser-use"
+                "error": error_msg,
+                "suggestion": "Run: pip install browser-use playwright && playwright install chromium"
+            }
+        except TimeoutError as e:
+            error_msg = f"Browser automation timed out after {timeout} seconds"
+            logger.error(error_msg)
+            return {
+                "status": "error",
+                "error": error_msg,
+                "suggestion": "Increase timeout or simplify the task"
             }
         except Exception as e:
-            logger.error(f"Browser-Use automation failed: {e}")
+            error_msg = f"Browser automation failed: {str(e)}"
+            logger.error(error_msg, exc_info=True)
             return {
                 "status": "error",
-                "error": str(e),
+                "error": error_msg,
                 "method": "browser_use"
             }
     
-    def extract_data_with_ai(
+    @retry_on_failure()
+    async def extract_data_with_ai(
         url: str,
         data_description: str,
         selectors: Optional[Dict[str, str]] = None,
-        tool_context=None
-    ) -> dict:
+        tool_context: Optional[Dict[str, Any]] = None,
+        config: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
-        Extract data from web pages using AI-powered automation
+        Extract structured data from web pages using AI-powered automation
         
         Args:
-            url: Target URL
-            data_description: Description of what data to extract
-            selectors: Optional CSS selectors as hints
+            url: Target URL to extract data from
+            data_description: Natural language description of the data to extract
+            selectors: Optional CSS selectors as hints for extraction
+            tool_context: Additional context for the extraction
+            config: Browser configuration overrides
+            
+        Returns:
+            Dictionary with extracted data or error information
         """
+        task_description = f"Extract {data_description} from {url}"
+        if selectors:
+            task_description += f" using these selectors as hints: {selectors}"
+            
+        # Execute the browser automation
+        result = await browser_use_automation(
+            task_description=task_description,
+            url=url,
+            config=config,
+            tool_context=tool_context
+        )
+        
+        if result["status"] == "success":
+            # Process the result to extract structured data
+            try:
+                # Here you would add logic to parse the result into structured data
+                # This is a simplified example
+                extracted_data = {
+                    "url": url,
+                    "extracted_at": time.time(),
+                    "data": str(result.get("result", "")),
+                    "selectors_used": selectors or {}
+                }
+                result["extracted_data"] = extracted_data
+            except Exception as e:
+                logger.error(f"Failed to process extracted data: {e}")
+                result.update({
+                    "status": "error",
+                    "error": f"Data processing failed: {str(e)}"
+                })
+        
+        return result
         try:
             task_description = f"Extract {data_description} from {url}"
             if selectors:

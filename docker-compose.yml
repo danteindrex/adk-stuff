@@ -1,41 +1,92 @@
 
 
+version: '3.8'
+
 services:
   app:
     build: 
       context: .
       dockerfile: Dockerfile.prod
+      # Enable buildkit for better caching and layer optimization
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    container_name: e-govt-app
+    hostname: e-govt-app
     ports:
       - "8080:8080"
     environment:
+      # Core application settings
       - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      
+      # Redis configuration
       - REDIS_URL=redis://redis:6379
+      
+      # Twilio configuration
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
       - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
       - TWILIO_WHATSAPP_NUMBER=${TWILIO_WHATSAPP_NUMBER}
       - TWILIO_WEBHOOK_VERIFY_TOKEN=${TWILIO_WEBHOOK_VERIFY_TOKEN}
+      
+      # API and security
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      
+      # Application settings
       - ADMIN_WHATSAPP_GROUP=${ADMIN_WHATSAPP_GROUP}
-      - LOG_LEVEL=INFO
       - SESSION_TIMEOUT_MINUTES=30
       - MAX_CONCURRENT_SESSIONS=1000
       - RATE_LIMIT_PER_MINUTE=60
       - RATE_LIMIT_PER_HOUR=1000
+      
+      # Browser automation settings
+      - BROWSER_HEADLESS=true
+      - BROWSER_TIMEOUT=300
+      - BROWSER_MAX_RETRIES=3
+      - BROWSER_USE_MODEL=gemini-2.0-flash-exp
+      - PLAYWRIGHT_BROWSERS_PATH=/home/appuser/.cache/ms-playwright/
     depends_on:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    # Add resource constraints
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
+    # Add proper volume mounts
     volumes:
       - app_logs:/app/logs
       - app_tmp:/app/tmp
+      - browser_cache:/home/appuser/.cache/ms-playwright
+      # Mount local development directory if needed
+      # - ./:/app:delegated
+    # Add security options
+    security_opt:
+      - no-new-privileges:true
+    # Configure logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Add tmpfs for temporary files
+    tmpfs:
+      - /tmp
+      - /var/tmp
 
   redis:
     image: redis:7-alpine
