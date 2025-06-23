@@ -17,9 +17,10 @@ from dataclasses import dataclass
 from enum import Enum
 
 from dotenv import load_dotenv
-from langchain_google_genai import ChatGoogleGenerativeAI
+import google.generativeai as genai
 from browser_use import Agent
 from google.adk.tools import FunctionTool
+from typing import Union, List, Dict, Any, Optional
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -38,11 +39,14 @@ CONVERSATION_LOG_DIR = os.getenv('CONVERSATION_LOG_DIR', './logs/browser_use/')
 # Ensure log directory exists
 os.makedirs(CONVERSATION_LOG_DIR, exist_ok=True)
 
-# Initialize the LLM model
-llm = ChatGoogleGenerativeAI(
-    model=os.getenv('BROWSER_USE_MODEL', 'gemini-2.0-flash-exp'),
-    temperature=0.2,
-    max_output_tokens=2048,
+# Initialize the Gemini model
+genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
+model = genai.GenerativeModel(
+    model_name=os.getenv('BROWSER_USE_MODEL', 'gemini-1.5-flash'),
+    generation_config={
+        'temperature': 0.2,
+        'max_output_tokens': 2048,
+    }
 )
 
 class BrowserAutomationError(Exception):

@@ -1,13 +1,9 @@
 """
 Application configuration settings
 """
-from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
-
+from pydantic import BaseSettings, Field, validator
+from typing import List, Optional, Union, Annotated
 import os
-from typing import List, Optional, Annotated
-from pydantic_settings import BaseSettings
-from pydantic import Field
 
 class Settings(BaseSettings):
     """Application settings"""
@@ -87,27 +83,26 @@ class Settings(BaseSettings):
     FAQ_CACHE_TTL_HOURS: int = Field(default=24, env="FAQ_CACHE_TTL_HOURS")
     FAQ_SIMILARITY_THRESHOLD: float = Field(default=0.8, env="FAQ_SIMILARITY_THRESHOLD")
     FAQ_MAX_CACHE_SIZE: int = Field(default=1000, env="FAQ_MAX_CACHE_SIZE")
-    SUPPORTED_LANGUAGES: Annotated[Optional[List[str]], NoDecode] = Field(
-        default=["en", "lg", "luo", "nyn"], env="SUPPORTED_LANGUAGES"
+    SUPPORTED_LANGUAGES: Optional[List[str]] = Field(
+        default_factory=lambda: ["en", "lg", "luo", "nyn"], env="SUPPORTED_LANGUAGES"
     )
-    GOVERNMENT_SERVICES: Annotated[Optional[List[str]], NoDecode] = Field(
-        default=["nira", "ura", "nssf", "nlis"], env="GOVERNMENT_SERVICES"
+    GOVERNMENT_SERVICES: Optional[List[str]] = Field(
+        default_factory=lambda: ["nira", "ura", "nssf", "nlis"], env="GOVERNMENT_SERVICES"
     )
 
     # Validators to split the raw CSV strings into lists
-    @field_validator("SUPPORTED_LANGUAGES", "GOVERNMENT_SERVICES", mode="before")
+    @validator("SUPPORTED_LANGUAGES", "GOVERNMENT_SERVICES", pre=True)
     @classmethod
     def _split_csv(cls, v):
         if isinstance(v, str):
             return [item.strip() for item in v.split(",") if item.strip()]
         return v
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=True,
-        extra="ignore",  # avoid errors on other .env entries
-    )
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        case_sensitive=True
+        extra="ignore"  # avoid errors on other .env entries
 
 
     @property

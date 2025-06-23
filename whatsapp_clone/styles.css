@@ -123,13 +123,13 @@ body {
     transform: translateY(-2px);
 }
 
-.twilio-option {
+.whatsapp-option {
     margin-top: 30px;
     padding-top: 20px;
     border-top: 1px solid #eee;
 }
 
-.twilio-toggle {
+.whatsapp-toggle {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -188,7 +188,7 @@ input:checked + .slider:before {
     border-radius: 50%;
 }
 
-.twilio-description {
+.whatsapp-description {
     color: #666;
     font-size: 14px;
     text-align: center;
@@ -711,7 +711,7 @@ input:checked + .slider:before {
     margin-right: 10px;
 }
 
-.twilio-note {
+.whatsapp-note {
     background: #1f2937;
     padding: 15px;
     border-radius: 8px;
@@ -723,7 +723,7 @@ input:checked + .slider:before {
     margin-top: 15px;
 }
 
-.twilio-note i {
+.whatsapp-note i {
     color: #25d366;
     margin-top: 2px;
 }

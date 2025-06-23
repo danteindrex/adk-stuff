@@ -10,7 +10,7 @@ A comprehensive multi-agent AI system that enables 45+ million Ugandans to acces
 ### 🌟 Primary User Interface: WhatsApp
 - **WhatsApp-First Approach**: Designed for seamless interaction through WhatsApp Business API
 - **No Public API Access**: This is a demonstration project - the API is not available for public/free use
-- **Twilio Integration**: Secure and reliable message handling via Twilio's WhatsApp API
+- **WhatsApp Business API Integration**: Direct integration with Meta's WhatsApp Business API
 
 ### 🚀 Built for Google ADK Hackathon 2025
 This project is our submission for the [Agent Development Kit Hackathon with Google Cloud](https://cloud.google.com/blog/topics/developers-practitioners/join-the-agent-development-kit-hackathon-with-google-cloud), focusing on:
@@ -23,7 +23,7 @@ This project is our submission for the [Agent Development Kit Hackathon with Goo
 This production-ready application is built with a WhatsApp-first approach, enabling Ugandan citizens to access government services through a conversational interface. The system leverages Google's ADK to create a sophisticated multi-agent system that handles complex workflows across multiple government agencies.
 
 **Key Features**:
-- **WhatsApp Business Integration** - Primary interface for citizens to access services via Twilio
+- **WhatsApp Business API Integration** - Direct integration with Meta's WhatsApp Business API
 - **Multi-Agent Architecture** - Google ADK-powered agents for intelligent task handling
 - **Government Service Automation** - NIRA, URA, NSSF, NLIS integration with browser automation
 - **Multi-language Support** - English, Luganda, Luo, Runyoro
@@ -31,17 +31,7 @@ This production-ready application is built with a WhatsApp-first approach, enabl
 - **AI/ML Integration** - Gemini AI with custom-trained models for contextual responses
 
 This production-ready full-stack application provides:
-- **WhatsApp Business Integration** - Citizens access services via WhatsApp using Twilio
-- **Web-based WhatsApp Clone** - Demo and testing interface with Google OAuth
-- **Supabase Database** - Persistent storage for all user interactions
-- **Comprehensive Admin Dashboard** - Complete system control and monitoring with real-time updates
-- **Multi-language Support** - English, Luganda, Luo, Runyoro
-- **Government Service Automation** - NIRA, URA, NSSF, NLIS integration with browser automation
-- **Modular Agent Architecture** - Google ADK-powered multi-agent system with MCP servers
-- **AI/ML Capabilities** - Custom-trained GPT model and integration with Gemini AI for intelligent responses
-
-This production-ready full-stack application provides:
-- **WhatsApp Business Integration** - Citizens access services via WhatsApp using Twilio
+- **WhatsApp Business API Integration** - Citizens access services via WhatsApp Business API
 - **Web-based WhatsApp Clone** - Demo and testing interface with Google OAuth
 - **Supabase Database** - Persistent storage for all user interactions
 - **Comprehensive Admin Dashboard** - Complete system control and monitoring with real-time updates

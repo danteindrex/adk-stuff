@@ -38,7 +38,7 @@ class WhatsAppClient:
         self.phone_number_id = phone_number_id
         self.access_token = access_token
         self.api_version = api_version
-        self.base_url = f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}
+        self.base_url = f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}/messages"
         self.session = None
         
     async def __aenter__(self):

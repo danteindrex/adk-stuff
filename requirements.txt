@@ -1,15 +1,19 @@
-# Minimal production requirements for smaller Docker image
-# Core FastAPI dependencies with pinned versions
-gunicorn
-uvicorn[standard]
+# Core Dependencies
 fastapi
+uvicorn
+gunicorn
 pydantic
-pydantic-settings
 python-multipart
 anyio
 httpx
 aiohttp
 python-dotenv
+
+# Web and Networking
+websockets
+httptools
+watchfiles
+pyyaml
 
 # OpenTelemetry
 opentelemetry-api
@@ -18,17 +22,18 @@ opentelemetry-exporter-otlp
 opentelemetry-instrumentation
 opentelemetry-instrumentation-fastapi
 
-# Security and encryption
+# Security
 python-jose[cryptography]
 passlib[bcrypt]
 PyJWT
 
-# Google ADK for multi-agent system
+# Google Services
 google-adk
-langchain-google-genai
+google-generativeai
 
 # WhatsApp Business API
-whatsapp-business-api
+aiohttp
+requests
 
 # Database
 supabase
@@ -36,18 +41,15 @@ supabase
 # Utilities
 requests
 psutil
-PyYAML==6.0.1 --only-binary=:all:
 
-# Rate limiting
+# Rate Limiting
 slowapi
 
 # Logging
 structlog
 python-json-logger
 
-# Session management
+# Session Management
 redis
-
-# Browser automation (installed separately in Dockerfile)
 # browser-use
 # playwright

@@ -1,0 +1,177 @@
+# Complete Dockerfile for Uganda E-Gov WhatsApp Helpdesk
+# Includes Redis, all dependencies, and production-ready configuration
+# Multi-stage build for optimized production deployment
+
+# Build stage
+FROM python:3.12-slim-bookworm as builder
+
+# Set build environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    VIRTUAL_ENV=/opt/venv
+
+# Install system dependencies for building
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    gcc \
+    g++ \
+    python3-dev \
+    libffi-dev \
+    build-essential \
+    git \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install -r requirements.txt
+
+# Install google-adk from GitHub (latest version)
+RUN pip install git+https://github.com/google/adk-python.git@main
+
+# Production stage
+FROM python:3.12-slim-bookworm
+
+# Set production environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH="/app" \
+    ENVIRONMENT=production \
+    LOG_LEVEL=INFO \
+    REDIS_URL=redis://localhost:6379
+
+# Install runtime dependencies including Redis
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    redis-server \
+    supervisor \
+    netcat-openbsd \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Create non-root user for security
+RUN groupadd -r appuser && useradd -r -g appuser -m appuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy application code with proper ownership
+COPY --chown=appuser:appuser . .
+
+# Install Playwright and browsers (required for browser automation)
+RUN pip install --no-cache-dir playwright==1.42.0 && \
+    playwright install --with-deps chromium firefox && \
+    playwright install-deps
+
+# Create necessary directories and set permissions
+RUN mkdir -p /app/logs /app/tmp /app/browser_use_logs /app/whatsapp_session \
+             /var/log/supervisor /var/run/redis /var/lib/redis && \
+    chown -R appuser:appuser /app && \
+    chown -R appuser:appuser /var/run/redis /var/lib/redis && \
+    chmod +x /app/entrypoint.sh
+
+# Configure Redis
+RUN echo "bind 127.0.0.1" >> /etc/redis/redis.conf && \
+    echo "port 6379" >> /etc/redis/redis.conf && \
+    echo "daemonize no" >> /etc/redis/redis.conf && \
+    echo "supervised systemd" >> /etc/redis/redis.conf && \
+    echo "dir /var/lib/redis" >> /etc/redis/redis.conf && \
+    echo "logfile /var/log/redis/redis-server.log" >> /etc/redis/redis.conf && \
+    echo "loglevel notice" >> /etc/redis/redis.conf && \
+    echo "maxmemory 256mb" >> /etc/redis/redis.conf && \
+    echo "maxmemory-policy allkeys-lru" >> /etc/redis/redis.conf
+
+# Create supervisor configuration
+RUN echo "[supervisord]" > /etc/supervisor/conf.d/supervisord.conf && \
+    echo "nodaemon=true" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "user=root" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "logfile=/var/log/supervisor/supervisord.log" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "pidfile=/var/run/supervisord.pid" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "[program:redis]" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "command=redis-server /etc/redis/redis.conf" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "user=appuser" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "autostart=true" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "autorestart=true" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "stdout_logfile=/var/log/supervisor/redis.log" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "stderr_logfile=/var/log/supervisor/redis_error.log" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "[program:app]" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "command=/app/entrypoint.sh uvicorn main:app --host 0.0.0.0 --port 8080 --workers 1 --access-log" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "directory=/app" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "user=appuser" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "autostart=true" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "autorestart=true" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "stdout_logfile=/var/log/supervisor/app.log" >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo "stderr_logfile=/var/log/supervisor/app_error.log" >> /etc/supervisor/conf.d/supervisord.conf
+
+# Create startup script
+RUN echo '#!/bin/bash' > /app/start.sh && \
+    echo 'set -e' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo 'echo "🇺🇬 Starting Uganda E-Gov WhatsApp Helpdesk (Complete Setup)..."' >> /app/start.sh && \
+    echo 'echo "================================================"' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo '# Wait for Redis to be ready' >> /app/start.sh && \
+    echo 'echo "⏳ Waiting for Redis to start..."' >> /app/start.sh && \
+    echo 'timeout=30' >> /app/start.sh && \
+    echo 'while [ $timeout -gt 0 ]; do' >> /app/start.sh && \
+    echo '    if redis-cli -h 127.0.0.1 -p 6379 ping > /dev/null 2>&1; then' >> /app/start.sh && \
+    echo '        echo "✅ Redis is ready!"' >> /app/start.sh && \
+    echo '        break' >> /app/start.sh && \
+    echo '    fi' >> /app/start.sh && \
+    echo '    echo "   Waiting for Redis... ($timeout seconds remaining)"' >> /app/start.sh && \
+    echo '    sleep 1' >> /app/start.sh && \
+    echo '    timeout=$((timeout - 1))' >> /app/start.sh && \
+    echo 'done' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo 'if [ $timeout -eq 0 ]; then' >> /app/start.sh && \
+    echo '    echo "❌ Redis failed to start within 30 seconds"' >> /app/start.sh && \
+    echo '    exit 1' >> /app/start.sh && \
+    echo 'fi' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo 'echo "🚀 Starting application..."' >> /app/start.sh && \
+    echo 'echo "================================================"' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo '# Start supervisor to manage both Redis and the app' >> /app/start.sh && \
+    echo 'exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf' >> /app/start.sh && \
+    chmod +x /app/start.sh
+
+# Expose application port
+EXPOSE 8080
+
+# Add comprehensive health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/health && redis-cli -h 127.0.0.1 -p 6379 ping || exit 1
+
+# Labels for metadata
+LABEL maintainer="Uganda E-Gov Team" \
+      description="Uganda E-Government WhatsApp Helpdesk - Complete Setup with Redis" \
+      version="2.0.0" \
+      org.opencontainers.image.title="Uganda E-Gov WhatsApp Helpdesk Complete" \
+      org.opencontainers.image.description="Multi-Agent AI System with Redis and all dependencies included" \
+      org.opencontainers.image.version="2.0.0" \
+      org.opencontainers.image.vendor="Uganda E-Gov Team" \
+      org.opencontainers.image.licenses="MIT"
+
+# Use the startup script as the default command
+CMD ["/app/start.sh"]
