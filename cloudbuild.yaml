@@ -1,17 +1,16 @@
 # Google Cloud Build configuration for Uganda E-Gov WhatsApp Helpdesk
 steps:
-  # Build the container image
+  # Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args: [
-      'build', 
-      '-f', 'Dockerfile.prod',
+      'build',
+      '-f', 'Dockerfile.cloudrun',
       '-t', 'gcr.io/$PROJECT_ID/uganda-egov-whatsapp:$BUILD_ID',
       '-t', 'gcr.io/$PROJECT_ID/uganda-egov-whatsapp:latest',
       '.'
     ]
-    timeout: '1200s'
 
-  # Push the container image to Container Registry
+  # Push the image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/uganda-egov-whatsapp:$BUILD_ID']
 
@@ -27,16 +26,20 @@ steps:
       '--region', 'us-central1',
       '--platform', 'managed',
       '--allow-unauthenticated',
-      '--port', '8080',
       '--memory', '2Gi',
       '--cpu', '2',
-      '--timeout', '300',
       '--concurrency', '100',
-      '--max-instances', '10',
+      '--max-instances', '5',
       '--min-instances', '1',
-      '--set-env-vars', 'ENVIRONMENT=production,LOG_LEVEL=INFO',
-      '--set-secrets', 'TWILIO_ACCOUNT_SID=twilio-account-sid:latest,TWILIO_AUTH_TOKEN=twilio-auth-token:latest,JWT_SECRET_KEY=jwt-secret-key:latest,ENCRYPTION_KEY=encryption-key:latest,GOOGLE_API_KEY=google-api-key:latest'
+      '--timeout', '300',
+      '--port', '8080',
+      '--set-env-vars', 'ENVIRONMENT=production,PORT_NO=8080'
     ]
+
+# Store build artifacts
+images:
+  - 'gcr.io/$PROJECT_ID/uganda-egov-whatsapp:$BUILD_ID'
+  - 'gcr.io/$PROJECT_ID/uganda-egov-whatsapp:latest'
 
 # Build options
 options:
@@ -44,10 +47,5 @@ options:
   diskSizeGb: '100'
   logging: CLOUD_LOGGING_ONLY
 
-# Build timeout
-timeout: '1800s'
-
-# Substitutions for environment-specific builds
-substitutions:
-  _REGION: 'us-central1'
-  _SERVICE_NAME: 'uganda-egov-whatsapp'
+# Timeout for the entire build
+timeout: '1200s'

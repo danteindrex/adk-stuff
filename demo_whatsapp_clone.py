@@ -21,9 +21,9 @@ def print_demo_banner():
     ║  🎯 Perfect WhatsApp UI Clone                                ║
     ║  🔐 Google OAuth + Demo Mode                                 ║
     ║  🤖 AI Government Services                                   ║
-    ║  📞 Twilio WhatsApp Integration                              ║
     ║  🌍 Multi-language Support                                   ║
     ║  📱 Mobile Responsive                                        ║
+    ║  🔄 Real-time Messaging                                      ║
     ╚══════════════════════════════════════════════════════════════╝
     """
     print(banner)
@@ -52,9 +52,11 @@ def show_features():
        - Land ownership verification (NLIS)
        - Multi-language support (English, Luganda, Luo, Runyoro)
     
-    📞 Twilio Integration
-       - Send messages to real WhatsApp
-       - Configurable phone number
+    🔄 WhatsApp Business API Integration
+    - Send/receive WhatsApp messages
+    - Media sharing (images, docs, audio)
+    - Message status updates
+    - Webhook integration
        - Toggle on/off functionality
        - Seamless backend integration
     
@@ -95,9 +97,9 @@ def show_demo_scenarios():
     6. ❓ General Help
        Type: "What services can you help me with?"
        
-    7. 📞 Twilio Test (if configured)
-       - Enable Twilio in settings
-       - Enter your WhatsApp number
+    7. 📱 WhatsApp Message Test
+       - Send a test message to the demo
+       - Try different message types (text, image, document)
        - Send a message and receive it on your phone
     """
     print(scenarios)

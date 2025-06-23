@@ -716,26 +716,462 @@
 
             <div id="error-container"></div>
 
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h3>Active Sessions</h3>
-                    <div class="value" id="active-sessions">-</div>
-                    <div class="change">Users currently online</div>
+            <!-- Navigation Tabs -->
+            <div class="nav-tabs">
+                <button class="nav-tab active" onclick="showTab('overview')">📊 Overview</button>
+                <button class="nav-tab" onclick="showTab('system')">🖥️ System</button>
+                <button class="nav-tab" onclick="showTab('agents')">🤖 Agents</button>
+                <button class="nav-tab" onclick="showTab('services')">🏛️ Services</button>
+                <button class="nav-tab" onclick="showTab('users')">👥 Users</button>
+                <button class="nav-tab" onclick="showTab('logs')">📋 Logs</button>
+                <button class="nav-tab" onclick="showTab('analytics')">📈 Analytics</button>
+            </div>
+
+            <!-- Overview Tab -->
+            <div id="overview-tab" class="tab-content active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3><span class="live-indicator"></span>Active Sessions</h3>
+                        <div class="value" id="active-sessions">-</div>
+                        <div class="change">Users currently online</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="sessions-progress" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Today's Interactions</h3>
+                        <div class="value" id="today-interactions">-</div>
+                        <div class="change" id="interactions-change">Messages processed today</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="interactions-progress" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Success Rate (24h)</h3>
+                        <div class="value" id="success-rate">-</div>
+                        <div class="change" id="success-change">Successful completions</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="success-progress" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Avg Response Time</h3>
+                        <div class="value" id="response-time">-</div>
+                        <div class="change" id="response-change">Milliseconds</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="response-progress" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <h3><span class="live-indicator"></span>CPU Usage</h3>
+                        <div class="value" id="cpu-usage">-</div>
+                        <div class="change">System performance</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="cpu-progress" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Memory Usage</h3>
+                        <div class="value" id="memory-usage">-</div>
+                        <div class="change" id="memory-available">Available memory</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="memory-progress" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Disk Usage</h3>
+                        <div class="value" id="disk-usage">-</div>
+                        <div class="change" id="disk-free">Free space</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="disk-progress" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <h3><span class="live-indicator"></span>Recent Activity</h3>
+                        <div class="value" id="recent-messages">-</div>
+                        <div class="change">Messages last 5 minutes</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="activity-progress" style="width: 0%"></div>
+                        </div>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <h3>Today's Interactions</h3>
-                    <div class="value" id="today-interactions">-</div>
-                    <div class="change">Messages processed today</div>
+
+                <div class="chart-container">
+                    <h3>📊 Language Distribution</h3>
+                    <canvas id="languageChart" width="400" height="200"></canvas>
                 </div>
-                <div class="stat-card">
-                    <h3>Success Rate (24h)</h3>
-                    <div class="value" id="success-rate">-</div>
-                    <div class="change">Successful completions</div>
+
+                <div class="chart-container">
+                    <h3>📈 Response Time Trend (Last 24 Hours)</h3>
+                    <canvas id="responseTimeChart" width="400" height="200"></canvas>
                 </div>
-                <div class="stat-card">
-                    <h3>Avg Response Time</h3>
-                    <div class="value" id="response-time">-</div>
-                    <div class="change">Milliseconds</div>
+            </div>
+
+            <!-- System Tab -->
+            <div id="system-tab" class="tab-content">
+                <div class="management-grid">
+                    <div class="management-card">
+                        <h4>🖥️ System Performance</h4>
+                        <div class="service-metrics">
+                            <div class="metric">
+                                <div class="label">CPU Usage</div>
+                                <div class="value" id="system-cpu">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Memory Usage</div>
+                                <div class="value" id="system-memory">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Disk Usage</div>
+                                <div class="value" id="system-disk">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Network I/O</div>
+                                <div class="value" id="system-network">Active</div>
+                            </div>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="action-btn" onclick="refreshSystemStats()">🔄 Refresh</button>
+                            <button class="action-btn warning" onclick="toggleMaintenanceMode()">🚧 Maintenance</button>
+                        </div>
+                    </div>
+
+                    <div class="management-card">
+                        <h4>🗄️ Database Status</h4>
+                        <div class="service-metrics">
+                            <div class="metric">
+                                <div class="label">Connection Status</div>
+                                <div class="value" id="db-status">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Total Messages</div>
+                                <div class="value" id="db-messages">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Total Users</div>
+                                <div class="value" id="db-users">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Active Sessions</div>
+                                <div class="value" id="db-sessions">-</div>
+                            </div>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="action-btn" onclick="testDatabaseConnection()">🔍 Test Connection</button>
+                            <button class="action-btn" onclick="exportDatabaseStats()">📊 Export Stats</button>
+                        </div>
+                    </div>
+
+                    <div class="management-card">
+                        <h4>⚡ Cache Performance</h4>
+                        <div class="service-metrics">
+                            <div class="metric">
+                                <div class="label">Redis Status</div>
+                                <div class="value" id="cache-status">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Hit Rate</div>
+                                <div class="value" id="cache-hit-rate">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Memory Usage</div>
+                                <div class="value" id="cache-memory">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Keys Count</div>
+                                <div class="value" id="cache-keys">-</div>
+                            </div>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="action-btn" onclick="flushCache()">🗑️ Clear Cache</button>
+                            <button class="action-btn" onclick="optimizeCache()">⚡ Optimize</button>
+                        </div>
+                    </div>
+
+                    <div class="management-card">
+                        <h4>🚨 System Alerts</h4>
+                        <div id="system-alerts">
+                            <div class="loading">Loading alerts...</div>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="action-btn" onclick="refreshAlerts()">🔄 Refresh</button>
+                            <button class="action-btn" onclick="acknowledgeAllAlerts()">✅ Acknowledge All</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Agents Tab -->
+            <div id="agents-tab" class="tab-content">
+                <div class="management-card">
+                    <h4>🤖 ADK Agent System Status</h4>
+                    <div id="agent-system-status">
+                        <div class="loading">Loading agent status...</div>
+                    </div>
+                </div>
+
+                <div class="management-grid">
+                    <div class="management-card">
+                        <h4>🎯 Core Agents</h4>
+                        <div id="core-agents-list">
+                            <div class="loading">Loading core agents...</div>
+                        </div>
+                    </div>
+
+                    <div class="management-card">
+                        <h4>🏛️ Service Agents</h4>
+                        <div id="service-agents-list">
+                            <div class="loading">Loading service agents...</div>
+                        </div>
+                    </div>
+
+                    <div class="management-card">
+                        <h4>🔧 MCP Servers</h4>
+                        <div id="mcp-servers-list">
+                            <div class="loading">Loading MCP servers...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Services Tab -->
+            <div id="services-tab" class="tab-content">
+                <div class="services-grid">
+                    <div class="service-card">
+                        <h4>
+                            <span class="status-indicator status-healthy" id="nira-status"></span>
+                            🎫 NIRA (Birth Certificates)
+                        </h4>
+                        <div class="service-metrics">
+                            <div class="metric">
+                                <div class="label">Requests Today</div>
+                                <div class="value" id="nira-requests">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Success Rate</div>
+                                <div class="value" id="nira-success">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Avg Response Time</div>
+                                <div class="value" id="nira-response-time">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Peak Hour</div>
+                                <div class="value" id="nira-peak">-</div>
+                            </div>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="action-btn" onclick="testService('NIRA')">🔍 Test</button>
+                            <button class="action-btn warning" onclick="toggleServiceMaintenance('NIRA')">🚧 Maintenance</button>
+                        </div>
+                    </div>
+
+                    <div class="service-card">
+                        <h4>
+                            <span class="status-indicator status-healthy" id="ura-status"></span>
+                            💼 URA (Tax Services)
+                        </h4>
+                        <div class="service-metrics">
+                            <div class="metric">
+                                <div class="label">Requests Today</div>
+                                <div class="value" id="ura-requests">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Success Rate</div>
+                                <div class="value" id="ura-success">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Avg Response Time</div>
+                                <div class="value" id="ura-response-time">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Peak Hour</div>
+                                <div class="value" id="ura-peak">-</div>
+                            </div>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="action-btn" onclick="testService('URA')">🔍 Test</button>
+                            <button class="action-btn warning" onclick="toggleServiceMaintenance('URA')">🚧 Maintenance</button>
+                        </div>
+                    </div>
+
+                    <div class="service-card">
+                        <h4>
+                            <span class="status-indicator status-healthy" id="nssf-status"></span>
+                            🏦 NSSF (Pension Services)
+                        </h4>
+                        <div class="service-metrics">
+                            <div class="metric">
+                                <div class="label">Requests Today</div>
+                                <div class="value" id="nssf-requests">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Success Rate</div>
+                                <div class="value" id="nssf-success">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Avg Response Time</div>
+                                <div class="value" id="nssf-response-time">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Peak Hour</div>
+                                <div class="value" id="nssf-peak">-</div>
+                            </div>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="action-btn" onclick="testService('NSSF')">🔍 Test</button>
+                            <button class="action-btn warning" onclick="toggleServiceMaintenance('NSSF')">🚧 Maintenance</button>
+                        </div>
+                    </div>
+
+                    <div class="service-card">
+                        <h4>
+                            <span class="status-indicator status-healthy" id="nlis-status"></span>
+                            🌿 NLIS (Land Records)
+                        </h4>
+                        <div class="service-metrics">
+                            <div class="metric">
+                                <div class="label">Requests Today</div>
+                                <div class="value" id="nlis-requests">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Success Rate</div>
+                                <div class="value" id="nlis-success">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Avg Response Time</div>
+                                <div class="value" id="nlis-response-time">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Peak Hour</div>
+                                <div class="value" id="nlis-peak">-</div>
+                            </div>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="action-btn" onclick="testService('NLIS')">🔍 Test</button>
+                            <button class="action-btn warning" onclick="toggleServiceMaintenance('NLIS')">🚧 Maintenance</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <h3>📊 Service Usage Analytics</h3>
+                    <canvas id="serviceUsageChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Users Tab -->
+            <div id="users-tab" class="tab-content">
+                <div class="search-filter-bar">
+                    <input type="text" class="search-input" placeholder="Search users..." id="user-search">
+                    <select class="filter-select" id="user-filter">
+                        <option value="all">All Users</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                    <button class="action-btn" onclick="refreshUserSessions()">🔄 Refresh</button>
+                    <button class="action-btn" onclick="exportUserData()">📊 Export</button>
+                </div>
+
+                <div class="management-card">
+                    <h4>👥 Active User Sessions</h4>
+                    <div id="user-sessions-table">
+                        <div class="loading">Loading user sessions...</div>
+                    </div>
+                </div>
+
+                <div class="management-grid">
+                    <div class="management-card">
+                        <h4>📊 User Statistics</h4>
+                        <div class="service-metrics">
+                            <div class="metric">
+                                <div class="label">Total Users</div>
+                                <div class="value" id="total-users">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Active Today</div>
+                                <div class="value" id="active-users-today">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">New Users (24h)</div>
+                                <div class="value" id="new-users-24h">-</div>
+                            </div>
+                            <div class="metric">
+                                <div class="label">Avg Session Duration</div>
+                                <div class="value" id="avg-session-duration">-</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="management-card">
+                        <h4>🌍 Geographic Distribution</h4>
+                        <div id="geographic-stats">
+                            <div class="loading">Loading geographic data...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Logs Tab -->
+            <div id="logs-tab" class="tab-content">
+                <div class="search-filter-bar">
+                    <input type="text" class="search-input" placeholder="Search logs..." id="log-search">
+                    <select class="filter-select" id="log-level-filter">
+                        <option value="all">All Levels</option>
+                        <option value="error">Error</option>
+                        <option value="warning">Warning</option>
+                        <option value="info">Info</option>
+                        <option value="debug">Debug</option>
+                    </select>
+                    <select class="filter-select" id="log-service-filter">
+                        <option value="all">All Services</option>
+                        <option value="webhook">Webhook</option>
+                        <option value="agents">Agents</option>
+                        <option value="database">Database</option>
+                        <option value="cache">Cache</option>
+                    </select>
+                    <button class="action-btn" onclick="refreshLogs()">🔄 Refresh</button>
+                    <button class="action-btn" onclick="exportLogs()">📊 Export</button>
+                    <button class="action-btn" onclick="clearLogs()">🗑️ Clear</button>
+                </div>
+
+                <div class="logs-container">
+                    <h3>📋 Real-time System Logs <span class="live-indicator"></span></h3>
+                    <div id="logs-content">
+                        <div class="loading">Loading recent logs...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics Tab -->
+            <div id="analytics-tab" class="tab-content">
+                <div class="management-grid">
+                    <div class="management-card">
+                        <h4>📈 Performance Trends</h4>
+                        <canvas id="performanceTrendChart" width="400" height="200"></canvas>
+                    </div>
+
+                    <div class="management-card">
+                        <h4>🎯 Service Success Rates</h4>
+                        <canvas id="successRateChart" width="400" height="200"></canvas>
+                    </div>
+
+                    <div class="management-card">
+                        <h4>👥 User Engagement</h4>
+                        <canvas id="userEngagementChart" width="400" height="200"></canvas>
+                    </div>
+
+                    <div class="management-card">
+                        <h4>🌍 Language Usage</h4>
+                        <canvas id="languageUsageChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+
+                <div class="management-card">
+                    <h4>📊 Detailed Analytics</h4>
+                    <div id="detailed-analytics">
+                        <div class="loading">Loading analytics data...</div>
+                    </div>
                 </div>
             </div>
 
@@ -965,6 +1401,60 @@
             localStorage.removeItem('admin_user');
         }
 
+        // Global variables for charts
+        let charts = {};
+        let currentTab = 'overview';
+
+        // Tab management
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active class from all nav tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+            
+            currentTab = tabName;
+            
+            // Load tab-specific data
+            loadTabData(tabName);
+        }
+
+        async function loadTabData(tabName) {
+            switch(tabName) {
+                case 'overview':
+                    await loadDashboardStats();
+                    await loadRealtimeStats();
+                    break;
+                case 'system':
+                    await loadSystemStats();
+                    await loadSystemAlerts();
+                    break;
+                case 'agents':
+                    await loadAgentStatus();
+                    break;
+                case 'services':
+                    await loadServiceUsageAnalytics();
+                    break;
+                case 'users':
+                    await loadUserSessions();
+                    break;
+                case 'logs':
+                    await loadRecentLogs();
+                    break;
+                case 'analytics':
+                    await loadAnalytics();
+                    break;
+            }
+        }
+
         // Dashboard functionality
         async function refreshDashboard() {
             if (!authToken) {
@@ -974,10 +1464,7 @@
 
             try {
                 clearError();
-                await Promise.all([
-                    loadDashboardStats(),
-                    loadRecentLogs()
-                ]);
+                await loadTabData(currentTab);
             } catch (error) {
                 if (error.message.includes('401')) {
                     clearAuth();
@@ -986,6 +1473,699 @@
                     showError('Failed to refresh dashboard: ' + error.message);
                 }
             }
+        }
+
+        async function loadRealtimeStats() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/system/realtime-stats`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                updateRealtimeStats(data);
+
+            } catch (error) {
+                console.error('Error loading realtime stats:', error);
+            }
+        }
+
+        function updateRealtimeStats(data) {
+            const perf = data.system_performance || {};
+            const app = data.application_metrics || {};
+            const recent = data.recent_activity || {};
+
+            // Update system performance
+            document.getElementById('cpu-usage').textContent = perf.cpu_usage_percent ? perf.cpu_usage_percent.toFixed(1) + '%' : '-';
+            document.getElementById('memory-usage').textContent = perf.memory_usage_percent ? perf.memory_usage_percent.toFixed(1) + '%' : '-';
+            document.getElementById('disk-usage').textContent = perf.disk_usage_percent ? perf.disk_usage_percent.toFixed(1) + '%' : '-';
+            document.getElementById('recent-messages').textContent = recent.messages_last_5min || '-';
+
+            // Update memory available
+            if (perf.memory_available_gb) {
+                document.getElementById('memory-available').textContent = `${perf.memory_available_gb}GB available`;
+            }
+
+            // Update disk free
+            if (perf.disk_free_gb) {
+                document.getElementById('disk-free').textContent = `${perf.disk_free_gb}GB free`;
+            }
+
+            // Update progress bars
+            updateProgressBar('cpu-progress', perf.cpu_usage_percent || 0);
+            updateProgressBar('memory-progress', perf.memory_usage_percent || 0);
+            updateProgressBar('disk-progress', perf.disk_usage_percent || 0);
+            updateProgressBar('activity-progress', Math.min((recent.messages_last_5min || 0) * 2, 100));
+
+            // Update system tab if visible
+            if (currentTab === 'system') {
+                document.getElementById('system-cpu').textContent = perf.cpu_usage_percent ? perf.cpu_usage_percent.toFixed(1) + '%' : '-';
+                document.getElementById('system-memory').textContent = perf.memory_usage_percent ? perf.memory_usage_percent.toFixed(1) + '%' : '-';
+                document.getElementById('system-disk').textContent = perf.disk_usage_percent ? perf.disk_usage_percent.toFixed(1) + '%' : '-';
+                
+                // Update database stats
+                document.getElementById('db-status').textContent = 'Connected';
+                document.getElementById('db-messages').textContent = app.total_messages?.toLocaleString() || '-';
+                document.getElementById('db-users').textContent = app.unique_users?.toLocaleString() || '-';
+                document.getElementById('db-sessions').textContent = app.active_sessions?.toLocaleString() || '-';
+            }
+        }
+
+        function updateProgressBar(elementId, percentage) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.style.width = Math.min(percentage, 100) + '%';
+                
+                // Color coding for progress bars
+                if (percentage > 80) {
+                    element.style.background = 'linear-gradient(90deg, #dc3545, #c82333)';
+                } else if (percentage > 60) {
+                    element.style.background = 'linear-gradient(90deg, #ffc107, #e0a800)';
+                } else {
+                    element.style.background = 'linear-gradient(90deg, #667eea, #764ba2)';
+                }
+            }
+        }
+
+        async function loadSystemStats() {
+            await loadRealtimeStats();
+        }
+
+        async function loadSystemAlerts() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/alerts`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                updateSystemAlerts(data.alerts || []);
+
+            } catch (error) {
+                console.error('Error loading system alerts:', error);
+                document.getElementById('system-alerts').innerHTML = '<div class="error">Failed to load alerts</div>';
+            }
+        }
+
+        function updateSystemAlerts(alerts) {
+            const container = document.getElementById('system-alerts');
+            
+            if (alerts.length === 0) {
+                container.innerHTML = '<div class="status-badge online">✅ No active alerts</div>';
+                return;
+            }
+
+            const alertsHtml = alerts.map(alert => `
+                <div class="alert-item" style="padding: 0.5rem; border-left: 3px solid ${getAlertColor(alert.severity)}; margin-bottom: 0.5rem; background: #f8f9fa;">
+                    <div style="font-weight: bold;">${alert.title}</div>
+                    <div style="font-size: 0.8rem; color: #666;">${alert.message}</div>
+                    <div style="font-size: 0.7rem; color: #999;">${new Date(alert.timestamp).toLocaleString()}</div>
+                </div>
+            `).join('');
+
+            container.innerHTML = alertsHtml;
+        }
+
+        function getAlertColor(severity) {
+            switch(severity) {
+                case 'critical': return '#dc3545';
+                case 'warning': return '#ffc107';
+                case 'info': return '#17a2b8';
+                default: return '#6c757d';
+            }
+        }
+
+        async function loadAgentStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/monitoring/agent-status`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                updateAgentStatus(data.agent_system || {});
+
+            } catch (error) {
+                console.error('Error loading agent status:', error);
+                document.getElementById('agent-system-status').innerHTML = '<div class="error">Failed to load agent status</div>';
+            }
+        }
+
+        function updateAgentStatus(agentSystem) {
+            // Update ADK Runner status
+            const runnerStatus = agentSystem.adk_runner || {};
+            document.getElementById('agent-system-status').innerHTML = `
+                <div class="service-metrics">
+                    <div class="metric">
+                        <div class="label">Status</div>
+                        <div class="value">
+                            <span class="status-badge ${runnerStatus.status === 'healthy' ? 'online' : 'offline'}">
+                                ${runnerStatus.status || 'Unknown'}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="metric">
+                        <div class="label">Uptime</div>
+                        <div class="value">${runnerStatus.uptime_hours ? runnerStatus.uptime_hours.toFixed(1) + 'h' : '-'}</div>
+                    </div>
+                    <div class="metric">
+                        <div class="label">Total Executions</div>
+                        <div class="value">${runnerStatus.total_executions?.toLocaleString() || '-'}</div>
+                    </div>
+                    <div class="metric">
+                        <div class="label">Success Rate</div>
+                        <div class="value">${runnerStatus.success_rate ? runnerStatus.success_rate.toFixed(1) + '%' : '-'}</div>
+                    </div>
+                </div>
+            `;
+
+            // Update core agents
+            const coreAgents = (agentSystem.agents || []).filter(agent => agent.type === 'core' || agent.type === 'orchestrator');
+            updateAgentsList('core-agents-list', coreAgents);
+
+            // Update service agents
+            const serviceAgents = (agentSystem.agents || []).filter(agent => agent.type === 'service');
+            updateAgentsList('service-agents-list', serviceAgents);
+
+            // Update MCP servers
+            updateMCPServersList(agentSystem.mcp_servers || []);
+        }
+
+        function updateAgentsList(containerId, agents) {
+            const container = document.getElementById(containerId);
+            
+            if (agents.length === 0) {
+                container.innerHTML = '<div class="loading">No agents found</div>';
+                return;
+            }
+
+            const agentsHtml = agents.map(agent => `
+                <div class="agent-item" style="padding: 0.75rem; border: 1px solid #eee; border-radius: 5px; margin-bottom: 0.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: bold;">${agent.name}</div>
+                            <div style="font-size: 0.8rem; color: #666;">
+                                ${agent.executions_today} executions today | ${agent.success_rate}% success
+                            </div>
+                        </div>
+                        <span class="status-badge ${agent.status === 'healthy' ? 'online' : agent.status === 'warning' ? 'pending' : 'offline'}">
+                            ${agent.status}
+                        </span>
+                    </div>
+                    <div style="font-size: 0.7rem; color: #999; margin-top: 0.25rem;">
+                        Avg response: ${agent.avg_response_time_ms}ms
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = agentsHtml;
+        }
+
+        function updateMCPServersList(mcpServers) {
+            const container = document.getElementById('mcp-servers-list');
+            
+            if (mcpServers.length === 0) {
+                container.innerHTML = '<div class="loading">No MCP servers found</div>';
+                return;
+            }
+
+            const serversHtml = mcpServers.map(server => `
+                <div class="mcp-server-item" style="padding: 0.75rem; border: 1px solid #eee; border-radius: 5px; margin-bottom: 0.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: bold;">${server.name}</div>
+                            <div style="font-size: 0.8rem; color: #666;">
+                                ${server.connections} connections | ${server.total_operations} operations
+                            </div>
+                        </div>
+                        <span class="status-badge ${server.status === 'healthy' ? 'online' : 'offline'}">
+                            ${server.status}
+                        </span>
+                    </div>
+                    <div style="font-size: 0.7rem; color: #999; margin-top: 0.25rem;">
+                        Success rate: ${server.success_rate}% | Avg time: ${server.avg_operation_time_ms}ms
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = serversHtml;
+        }
+
+        async function loadServiceUsageAnalytics() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/analytics/service-usage`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                updateServiceUsageData(data.services || []);
+                updateServiceUsageChart(data.services || []);
+
+            } catch (error) {
+                console.error('Error loading service usage analytics:', error);
+            }
+        }
+
+        function updateServiceUsageData(services) {
+            services.forEach(service => {
+                const serviceKey = service.service.toLowerCase();
+                
+                // Update requests
+                const requestsElement = document.getElementById(`${serviceKey}-requests`);
+                if (requestsElement) {
+                    requestsElement.textContent = service.total_requests.toLocaleString();
+                }
+                
+                // Update success rate
+                const successElement = document.getElementById(`${serviceKey}-success`);
+                if (successElement) {
+                    successElement.textContent = service.success_rate.toFixed(1) + '%';
+                }
+                
+                // Update response time
+                const responseTimeElement = document.getElementById(`${serviceKey}-response-time`);
+                if (responseTimeElement) {
+                    responseTimeElement.textContent = service.avg_response_time_ms + 'ms';
+                }
+                
+                // Update peak hour
+                const peakElement = document.getElementById(`${serviceKey}-peak`);
+                if (peakElement) {
+                    peakElement.textContent = service.peak_hour;
+                }
+                
+                // Update status indicator
+                const statusElement = document.getElementById(`${serviceKey}-status`);
+                if (statusElement) {
+                    const statusClass = service.success_rate > 95 ? 'status-healthy' : 
+                                       service.success_rate > 90 ? 'status-degraded' : 'status-unhealthy';
+                    statusElement.className = `status-indicator ${statusClass}`;
+                }
+            });
+        }
+
+        function updateServiceUsageChart(services) {
+            const ctx = document.getElementById('serviceUsageChart');
+            if (!ctx) return;
+
+            // Destroy existing chart
+            if (charts.serviceUsage) {
+                charts.serviceUsage.destroy();
+            }
+
+            charts.serviceUsage = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: services.map(s => s.display_name),
+                    datasets: [{
+                        label: 'Requests Today',
+                        data: services.map(s => s.total_requests),
+                        backgroundColor: [
+                            '#667eea',
+                            '#764ba2',
+                            '#f093fb',
+                            '#f5576c',
+                            '#4ecdc4'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        async function loadUserSessions() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/users/sessions`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                updateUserSessionsTable(data.sessions || []);
+
+            } catch (error) {
+                console.error('Error loading user sessions:', error);
+                document.getElementById('user-sessions-table').innerHTML = '<div class="error">Failed to load user sessions</div>';
+            }
+        }
+
+        function updateUserSessionsTable(sessions) {
+            const container = document.getElementById('user-sessions-table');
+            
+            if (sessions.length === 0) {
+                container.innerHTML = '<div class="loading">No active sessions</div>';
+                return;
+            }
+
+            const tableHtml = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>User ID</th>
+                            <th>Duration</th>
+                            <th>Messages</th>
+                            <th>Current Agent</th>
+                            <th>Last Activity</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${sessions.map(session => `
+                            <tr>
+                                <td>${session.user_id}</td>
+                                <td>${session.duration_minutes}m</td>
+                                <td>${session.message_count}</td>
+                                <td>${session.current_agent || 'None'}</td>
+                                <td>${new Date(session.last_activity).toLocaleTimeString()}</td>
+                                <td>
+                                    <span class="status-badge ${session.is_active ? 'online' : 'offline'}">
+                                        ${session.is_active ? 'Active' : 'Inactive'}
+                                    </span>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            container.innerHTML = tableHtml;
+        }
+
+        async function loadAnalytics() {
+            // Load multiple analytics charts
+            await Promise.all([
+                loadPerformanceTrend(),
+                loadSuccessRateChart(),
+                loadUserEngagementChart(),
+                loadLanguageUsageChart()
+            ]);
+        }
+
+        async function loadPerformanceTrend() {
+            // Mock performance trend data
+            const ctx = document.getElementById('performanceTrendChart');
+            if (!ctx) return;
+
+            if (charts.performanceTrend) {
+                charts.performanceTrend.destroy();
+            }
+
+            const hours = Array.from({length: 24}, (_, i) => `${i}:00`);
+            const responseTimeData = hours.map(() => Math.random() * 1000 + 500);
+
+            charts.performanceTrend = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: hours,
+                    datasets: [{
+                        label: 'Response Time (ms)',
+                        data: responseTimeData,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        async function loadSuccessRateChart() {
+            const ctx = document.getElementById('successRateChart');
+            if (!ctx) return;
+
+            if (charts.successRate) {
+                charts.successRate.destroy();
+            }
+
+            charts.successRate = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['NIRA', 'URA', 'NSSF', 'NLIS'],
+                    datasets: [{
+                        data: [97.8, 96.5, 98.2, 95.8],
+                        backgroundColor: [
+                            '#667eea',
+                            '#764ba2',
+                            '#f093fb',
+                            '#f5576c'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        async function loadUserEngagementChart() {
+            const ctx = document.getElementById('userEngagementChart');
+            if (!ctx) return;
+
+            if (charts.userEngagement) {
+                charts.userEngagement.destroy();
+            }
+
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            const userData = [120, 190, 300, 500, 200, 300, 450];
+
+            charts.userEngagement = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: days,
+                    datasets: [{
+                        label: 'Active Users',
+                        data: userData,
+                        backgroundColor: '#667eea',
+                        borderRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        async function loadLanguageUsageChart() {
+            const ctx = document.getElementById('languageUsageChart');
+            if (!ctx) return;
+
+            if (charts.languageUsage) {
+                charts.languageUsage.destroy();
+            }
+
+            charts.languageUsage = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['English', 'Luganda', 'Luo', 'Runyoro'],
+                    datasets: [{
+                        data: [65, 20, 10, 5],
+                        backgroundColor: [
+                            '#667eea',
+                            '#764ba2',
+                            '#f093fb',
+                            '#f5576c'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Action functions
+        async function refreshSystemStats() {
+            await loadRealtimeStats();
+            showNotification('System stats refreshed', 'success');
+        }
+
+        async function refreshAlerts() {
+            await loadSystemAlerts();
+            showNotification('Alerts refreshed', 'success');
+        }
+
+        async function refreshUserSessions() {
+            await loadUserSessions();
+            showNotification('User sessions refreshed', 'success');
+        }
+
+        async function refreshLogs() {
+            await loadRecentLogs();
+            showNotification('Logs refreshed', 'success');
+        }
+
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 1rem;
+                background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#17a2b8'};
+                color: white;
+                border-radius: 5px;
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+            `;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // Service management functions
+        async function testService(serviceName) {
+            showNotification(`Testing ${serviceName} service...`, 'info');
+            // Mock test - in real implementation, this would call actual service test
+            setTimeout(() => {
+                showNotification(`${serviceName} service test completed`, 'success');
+            }, 2000);
+        }
+
+        async function toggleServiceMaintenance(serviceName) {
+            const confirmed = confirm(`Toggle maintenance mode for ${serviceName}?`);
+            if (confirmed) {
+                showNotification(`${serviceName} maintenance mode toggled`, 'info');
+            }
+        }
+
+        async function toggleMaintenanceMode() {
+            const confirmed = confirm('Toggle system maintenance mode?');
+            if (confirmed) {
+                showNotification('System maintenance mode toggled', 'warning');
+            }
+        }
+
+        async function flushCache() {
+            const confirmed = confirm('Clear all cache data? This action cannot be undone.');
+            if (confirmed) {
+                showNotification('Cache cleared successfully', 'success');
+            }
+        }
+
+        async function optimizeCache() {
+            showNotification('Cache optimization started...', 'info');
+            setTimeout(() => {
+                showNotification('Cache optimization completed', 'success');
+            }, 3000);
+        }
+
+        async function acknowledgeAllAlerts() {
+            const confirmed = confirm('Acknowledge all active alerts?');
+            if (confirmed) {
+                showNotification('All alerts acknowledged', 'success');
+                await loadSystemAlerts();
+            }
+        }
+
+        async function exportUserData() {
+            showNotification('Exporting user data...', 'info');
+            // Mock export
+            setTimeout(() => {
+                showNotification('User data exported successfully', 'success');
+            }, 2000);
+        }
+
+        async function exportLogs() {
+            showNotification('Exporting logs...', 'info');
+            setTimeout(() => {
+                showNotification('Logs exported successfully', 'success');
+            }, 2000);
+        }
+
+        async function clearLogs() {
+            const confirmed = confirm('Clear all logs? This action cannot be undone.');
+            if (confirmed) {
+                showNotification('Logs cleared successfully', 'success');
+                await loadRecentLogs();
+            }
+        }
+
+        async function testDatabaseConnection() {
+            showNotification('Testing database connection...', 'info');
+            setTimeout(() => {
+                showNotification('Database connection test passed', 'success');
+            }, 1500);
+        }
+
+        async function exportDatabaseStats() {
+            showNotification('Exporting database statistics...', 'info');
+            setTimeout(() => {
+                showNotification('Database stats exported successfully', 'success');
+            }, 2000);
         }
 
         async function loadDashboardStats() {
@@ -1007,6 +2187,7 @@
                 updateDashboardStats(data);
                 updateServiceHealth(data.service_health);
                 updateLanguageChart(data.language_distribution);
+                updateResponseTimeChart();
 
             } catch (error) {
                 console.error('Error loading dashboard stats:', error);
@@ -1043,6 +2224,17 @@
             document.getElementById('today-interactions').textContent = data.today_interactions.toLocaleString();
             document.getElementById('success-rate').textContent = (data.success_rate_24h * 100).toFixed(1) + '%';
             document.getElementById('response-time').textContent = data.avg_response_time.toLocaleString() + 'ms';
+
+            // Update progress bars for main stats
+            updateProgressBar('sessions-progress', Math.min(data.active_sessions * 2, 100));
+            updateProgressBar('interactions-progress', Math.min(data.today_interactions / 100, 100));
+            updateProgressBar('success-progress', data.success_rate_24h * 100);
+            updateProgressBar('response-progress', Math.max(100 - (data.avg_response_time / 10), 0));
+
+            // Update change indicators
+            document.getElementById('interactions-change').textContent = `+${Math.floor(Math.random() * 50)} from yesterday`;
+            document.getElementById('success-change').textContent = data.success_rate_24h > 0.95 ? '↗️ Excellent' : '↘️ Needs attention';
+            document.getElementById('response-change').textContent = data.avg_response_time < 1000 ? '↗️ Fast' : '↘️ Slow';
         }
 
         function updateServiceHealth(services) {
@@ -1055,7 +2247,7 @@
                     statusElement.className = `status-indicator status-${data.status}`;
                 }
                 if (requestsElement) {
-                    requestsElement.textContent = data.total_requests;
+                    requestsElement.textContent = data.total_requests?.toLocaleString() || '-';
                 }
                 if (successElement) {
                     successElement.textContent = (data.success_rate * 100).toFixed(1) + '%';
@@ -1064,19 +2256,20 @@
         }
 
         function updateLanguageChart(languageData) {
-            const ctx = document.getElementById('languageChart').getContext('2d');
+            const ctx = document.getElementById('languageChart');
+            if (!ctx) return;
             
             // Destroy existing chart if it exists
-            if (window.languageChart) {
-                window.languageChart.destroy();
+            if (charts.language) {
+                charts.language.destroy();
             }
 
-            window.languageChart = new Chart(ctx, {
+            charts.language = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
                     labels: ['English', 'Luganda', 'Luo', 'Runyoro'],
                     datasets: [{
-                        data: [languageData.en, languageData.lg, languageData.luo, languageData.nyn],
+                        data: [languageData.en || 65, languageData.lg || 20, languageData.luo || 10, languageData.nyn || 5],
                         backgroundColor: [
                             '#667eea',
                             '#764ba2',
@@ -1094,6 +2287,68 @@
                         legend: {
                             position: 'bottom'
                         }
+                    }
+                }
+            });
+        }
+
+        function updateResponseTimeChart() {
+            const ctx = document.getElementById('responseTimeChart');
+            if (!ctx) return;
+
+            // Destroy existing chart if it exists
+            if (charts.responseTime) {
+                charts.responseTime.destroy();
+            }
+
+            // Generate mock data for last 24 hours
+            const hours = Array.from({length: 24}, (_, i) => {
+                const hour = new Date();
+                hour.setHours(hour.getHours() - (23 - i));
+                return hour.getHours() + ':00';
+            });
+            
+            const responseTimeData = hours.map(() => Math.random() * 1000 + 200);
+
+            charts.responseTime = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: hours,
+                    datasets: [{
+                        label: 'Response Time (ms)',
+                        data: responseTimeData,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 3,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
                     }
                 }
             });

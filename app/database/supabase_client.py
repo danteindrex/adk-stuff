@@ -57,11 +57,11 @@ class SupabaseClient:
     
     def __init__(self):
         self.supabase_url = os.getenv("SUPABASE_URL")
-        self.supabase_key = os.getenv("SUPABASE_ANON_KEY")
+        self.supabase_key=os.getenv("SUPABASE_SERVICE_ROLE_KEY") 
         
         logger.info(f"Initializing Supabase client...")
         logger.info(f"SUPABASE_URL present: {bool(self.supabase_url)}")
-        logger.info(f"SUPABASE_ANON_KEY present: {bool(self.supabase_key)}")
+        logger.info(f"SUPABASE_SERVICE_ROLE_KEY present: {bool(self.supabase_key)}")
         
         if not self.supabase_url or not self.supabase_key:
             error_msg = "Supabase credentials missing from environment variables. "

@@ -1,13 +1,13 @@
 """
 Application configuration settings
 """
-from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
-
+try:
+    from pydantic_settings import BaseSettings
+except ImportError:
+    from pydantic import BaseSettings
+from pydantic import Field, validator
+from typing import List, Optional, Union, Annotated
 import os
-from typing import List, Optional, Annotated
-from pydantic_settings import BaseSettings
-from pydantic import Field
 
 class Settings(BaseSettings):
     """Application settings"""
@@ -17,18 +17,34 @@ class Settings(BaseSettings):
     DEBUG: bool = Field(default=False, env="DEBUG")
     LOG_LEVEL: str = Field(default="INFO", env="LOG_LEVEL")
     
-    # Twilio WhatsApp Configuration
-    TWILIO_ACCOUNT_SID: str = Field(..., env="TWILIO_ACCOUNT_SID")
-    TWILIO_AUTH_TOKEN: str = Field(..., env="TWILIO_AUTH_TOKEN")
-    TWILIO_WHATSAPP_NUMBER: str = Field(..., env="TWILIO_WHATSAPP_NUMBER")
-    TWILIO_WEBHOOK_VERIFY_TOKEN: str = Field(..., env="TWILIO_WEBHOOK_VERIFY_TOKEN")
-    TWILIO_API_KEY_SID: Optional[str] = Field(None, env="TWILIO_API_KEY_SID")
+    # WhatsApp Business Cloud API Configuration
+    WHATSAPP_PHONE_NUMBER_ID: str = Field(..., env="WHATSAPP_PHONE_NUMBER_ID")
+    WHATSAPP_ACCESS_TOKEN: str = Field(..., env="WHATSAPP_ACCESS_TOKEN")
+    WHATSAPP_BUSINESS_ACCOUNT_ID: str = Field(..., env="WHATSAPP_BUSINESS_ACCOUNT_ID")
+    WHATSAPP_APP_ID: str = Field(..., env="WHATSAPP_APP_ID")
+    WHATSAPP_APP_SECRET: str = Field(..., env="WHATSAPP_APP_SECRET")
+    WHATSAPP_VERIFY_TOKEN: str = Field(..., env="WHATSAPP_VERIFY_TOKEN")
+    WHATSAPP_WEBHOOK_SECRET: Optional[str] = Field(None, env="WHATSAPP_WEBHOOK_SECRET")
+    WHATSAPP_API_VERSION: str = Field(default="v17.0", env="WHATSAPP_API_VERSION")
+    WHATSAPP_API_URL: str = Field(default="https://graph.facebook.com", env="WHATSAPP_API_URL")
     
-    # Legacy WhatsApp Business API (can be removed after migration)
-    WHATSAPP_ACCESS_TOKEN: Optional[str] = Field(None, env="WHATSAPP_ACCESS_TOKEN")
-    WHATSAPP_PHONE_NUMBER_ID: Optional[str] = Field(None, env="WHATSAPP_PHONE_NUMBER_ID")
-    WHATSAPP_WEBHOOK_VERIFY_TOKEN: Optional[str] = Field(None, env="WHATSAPP_WEBHOOK_VERIFY_TOKEN")
-    WHATSAPP_BUSINESS_ACCOUNT_ID: Optional[str] = Field(None, env="WHATSAPP_BUSINESS_ACCOUNT_ID")
+    # WhatsApp Message Configuration
+    WHATSAPP_MESSAGE_TEMPLATE_NAMESPACE: Optional[str] = Field(
+        default=None, 
+        env="WHATSAPP_MESSAGE_TEMPLATE_NAMESPACE"
+    )
+    WHATSAPP_MESSAGE_PREVIEW_URL: bool = Field(default=False, env="WHATSAPP_MESSAGE_PREVIEW_URL")
+    WHATSAPP_MESSAGE_TIMEOUT: int = Field(default=30, env="WHATSAPP_MESSAGE_TIMEOUT")
+    
+    # WhatsApp Webhook Configuration
+    WHATSAPP_WEBHOOK_PATH: str = Field(
+        default="/api/v1/whatsapp/webhook", 
+        env="WHATSAPP_WEBHOOK_PATH"
+    )
+    WHATSAPP_WEBHOOK_VERIFY_TIMEOUT: int = Field(
+        default=5, 
+        env="WHATSAPP_WEBHOOK_VERIFY_TIMEOUT"
+    )
     
     # Server Cache Configuration
     CACHE_DEFAULT_TTL_HOURS: int = Field(default=48, env="CACHE_DEFAULT_TTL_HOURS")  # 2 days
@@ -71,27 +87,26 @@ class Settings(BaseSettings):
     FAQ_CACHE_TTL_HOURS: int = Field(default=24, env="FAQ_CACHE_TTL_HOURS")
     FAQ_SIMILARITY_THRESHOLD: float = Field(default=0.8, env="FAQ_SIMILARITY_THRESHOLD")
     FAQ_MAX_CACHE_SIZE: int = Field(default=1000, env="FAQ_MAX_CACHE_SIZE")
-    SUPPORTED_LANGUAGES: Annotated[Optional[List[str]], NoDecode] = Field(
-        default=["en", "lg", "luo", "nyn"], env="SUPPORTED_LANGUAGES"
+    SUPPORTED_LANGUAGES: Optional[List[str]] = Field(
+        default_factory=lambda: ["en", "lg", "luo", "nyn"], env="SUPPORTED_LANGUAGES"
     )
-    GOVERNMENT_SERVICES: Annotated[Optional[List[str]], NoDecode] = Field(
-        default=["nira", "ura", "nssf", "nlis"], env="GOVERNMENT_SERVICES"
+    GOVERNMENT_SERVICES: Optional[List[str]] = Field(
+        default_factory=lambda: ["nira", "ura", "nssf", "nlis"], env="GOVERNMENT_SERVICES"
     )
 
     # Validators to split the raw CSV strings into lists
-    @field_validator("SUPPORTED_LANGUAGES", "GOVERNMENT_SERVICES", mode="before")
+    @validator("SUPPORTED_LANGUAGES", "GOVERNMENT_SERVICES", pre=True)
     @classmethod
     def _split_csv(cls, v):
         if isinstance(v, str):
             return [item.strip() for item in v.split(",") if item.strip()]
         return v
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=True,
-        extra="ignore",  # avoid errors on other .env entries
-    )
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        case_sensitive=True
+        extra="ignore"  # avoid errors on other .env entries
 
 
     @property

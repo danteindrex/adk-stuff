@@ -6,22 +6,27 @@ Handles NIRA (National Identification and Registration Authority) services
 import logging
 from google.adk.agents import LlmAgent
 from ..mcp_servers.internal_mcp_tools import get_government_portal_tools, get_internal_browser_tools
-
+from ..mcp_servers.mcp_tools import mcp_playwright
 logger = logging.getLogger(__name__)
-
+from ..mcp_servers.browser_use_tools import automate_government_portal
 async def create_birth_agent():
     """Create birth certificate agent with enhanced automation tools"""
     try:
         # Get internal tools (self-contained, no external dependencies)
-        browser_tools = await get_internal_browser_tools()
-        portal_tools = await get_government_portal_tools()
+        browser_tools = await mcp_playwright()
+        portal_tools = await FunctionTool(automate_government_portal)
         
         # Combine all tools
-        all_tools = browser_tools + portal_tools
+        all_tools = [browser_tools, portal_tools]
         
-        agent = LlmAgent(
+           
+        
+        
+        logger.info("Birth certificate agent created successfully")
+        return LlmAgent(
             name="birth_agent",
             model="gemini-2.0-flash",
+            tools=all_tools,
             instruction="""You are a birth certificate specialist agent for the Uganda E-Gov WhatsApp Helpdesk.
             
             Your primary responsibility is to help users with NIRA (National Identification and Registration Authority) services, specifically birth certificates.
@@ -74,9 +79,6 @@ async def create_birth_agent():
             description="Handles birth certificate status checks and NIRA portal automation.",
             tools=all_tools
         )
-        
-        logger.info("Birth certificate agent created successfully")
-        return agent
         
     except Exception as e:
         logger.error(f"Failed to create birth agent: {e}")

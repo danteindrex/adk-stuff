@@ -5,8 +5,8 @@ class WhatsAppClone {
     constructor() {
         this.currentUser = null;
         this.currentSession = null;
-        this.twilioEnabled = false;
-        this.twilioPhone = '';
+        this.whatsappEnabled = false;
+        this.whatsappPhone = '';
         this.messages = [];
         this.sessions = [];
         this.isTyping = false;
@@ -50,11 +50,11 @@ class WhatsAppClone {
             }
         });
 
-        // Twilio toggle
-        const twilioToggle = document.getElementById('twilioToggle');
-        if (twilioToggle) {
-            twilioToggle.addEventListener('change', (e) => {
-                this.twilioEnabled = e.target.checked;
+        // WhatsApp toggle
+        const whatsappToggle = document.getElementById('whatsappToggle');
+        if (whatsappToggle) {
+            whatsappToggle.addEventListener('change', (e) => {
+                this.whatsappEnabled = e.target.checked;
                 this.saveSettings();
             });
         }
@@ -316,9 +316,9 @@ class WhatsAppClone {
                 this.currentSession = { id: aiResponse.session_id };
             }
             
-            // Send via Twilio if enabled
-            if (this.twilioEnabled && this.twilioPhone) {
-                await this.sendViaTwilio(messageText, aiResponse.reply);
+            // Send via WhatsApp if enabled
+            if (this.whatsappEnabled && this.whatsappPhone) {
+                await this.sendViaWhatsApp(messageText, aiResponse.reply);
             }
             
             // Refresh sessions list to show updated message count
@@ -389,27 +389,27 @@ How can I assist you today?`,
         }
     }
 
-    async sendViaTwilio(userMessage, aiResponse) {
+    async sendViaWhatsApp(userMessage, aiResponse) {
         try {
-            const response = await fetch('/api/twilio/send', {
+            const response = await fetch('/api/whatsapp/send', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    to: this.twilioPhone,
+                    to: this.whatsappPhone,
                     message: `User: ${userMessage}\n\nAI: ${aiResponse}`,
                     from_web: true
                 })
             });
 
             if (response.ok) {
-                this.showToast('Message sent via Twilio!', 'success');
+                this.showToast('Message sent via WhatsApp!', 'success');
             } else {
-                console.error('Twilio send failed');
+                console.error('WhatsApp send failed');
             }
         } catch (error) {
-            console.error('Twilio error:', error);
+            console.error('WhatsApp error:', error);
         }
     }
 
@@ -535,26 +535,26 @@ How can I assist you today?`,
         this.showToast('Settings panel coming soon!', 'info');
     }
 
-    showTwilioSettings() {
+    showWhatsAppSettings() {
         this.hideMenu();
-        document.getElementById('twilioModal').style.display = 'flex';
+        document.getElementById('whatsappModal').style.display = 'flex';
         
         // Load current settings
-        document.getElementById('twilioPhone').value = this.twilioPhone;
-        document.getElementById('enableTwilioSync').checked = this.twilioEnabled;
+        document.getElementById('whatsappPhone').value = this.whatsappPhone;
+        document.getElementById('enableWhatsAppSync').checked = this.whatsappEnabled;
     }
 
-    closeTwilioModal() {
-        document.getElementById('twilioModal').style.display = 'none';
+    closeWhatsAppModal() {
+        document.getElementById('whatsappModal').style.display = 'none';
     }
 
-    saveTwilioSettings() {
-        this.twilioPhone = document.getElementById('twilioPhone').value;
-        this.twilioEnabled = document.getElementById('enableTwilioSync').checked;
+    saveWhatsAppSettings() {
+        this.whatsappPhone = document.getElementById('whatsappPhone').value;
+        this.whatsappEnabled = document.getElementById('enableWhatsAppSync').checked;
         
         this.saveSettings();
-        this.closeTwilioModal();
-        this.showToast('Twilio settings saved!', 'success');
+        this.closeWhatsAppModal();
+        this.showToast('WhatsApp settings saved!', 'success');
     }
 
     logout() {
@@ -579,8 +579,8 @@ How can I assist you today?`,
     // Storage functions
     saveSettings() {
         const settings = {
-            twilioEnabled: this.twilioEnabled,
-            twilioPhone: this.twilioPhone
+            whatsappEnabled: this.whatsappEnabled,
+            whatsappPhone: this.whatsappPhone
         };
         localStorage.setItem('whatsapp_settings', JSON.stringify(settings));
     }
@@ -589,13 +589,13 @@ How can I assist you today?`,
         const settings = localStorage.getItem('whatsapp_settings');
         if (settings) {
             const parsed = JSON.parse(settings);
-            this.twilioEnabled = parsed.twilioEnabled || false;
-            this.twilioPhone = parsed.twilioPhone || '';
+            this.whatsappEnabled = parsed.whatsappEnabled || false;
+            this.whatsappPhone = parsed.whatsappPhone || '';
             
             // Update UI
-            const twilioToggle = document.getElementById('twilioToggle');
-            if (twilioToggle) {
-                twilioToggle.checked = this.twilioEnabled;
+            const whatsappToggle = document.getElementById('whatsappToggle');
+            if (whatsappToggle) {
+                whatsappToggle.checked = this.whatsappEnabled;
             }
         }
     }
@@ -703,16 +703,16 @@ function showSettings() {
     whatsappClone.showSettings();
 }
 
-function showTwilioSettings() {
-    whatsappClone.showTwilioSettings();
+function showWhatsAppSettings() {
+    whatsappClone.showWhatsAppSettings();
 }
 
-function closeTwilioModal() {
-    whatsappClone.closeTwilioModal();
+function closeWhatsAppModal() {
+    whatsappClone.closeWhatsAppModal();
 }
 
-function saveTwilioSettings() {
-    whatsappClone.saveTwilioSettings();
+function saveWhatsAppSettings() {
+    whatsappClone.saveWhatsAppSettings();
 }
 
 function logout() {

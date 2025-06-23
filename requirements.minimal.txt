@@ -1,0 +1,36 @@
+# Minimal production requirements for smaller Docker image
+# Core FastAPI dependencies
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-multipart
+aiohttp
+python-dotenv
+
+# Security and encryption
+PyJWT
+passlib[bcrypt]
+
+# Google ADK for multi-agent system
+google-adk
+
+# Communication
+twilio
+
+# Database
+supabase
+
+# Utilities
+requests
+psutil
+
+# Rate limiting
+slowapi
+
+# Logging
+structlog
+
+# Session management (Redis alternative - use in-memory for minimal setup)
+redis
+# Comment out for ultra-minimal setup

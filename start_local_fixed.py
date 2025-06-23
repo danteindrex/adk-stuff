@@ -51,20 +51,20 @@ def check_dependencies():
     logger.info("Checking Python dependencies...")
     
     required_packages = [
-        'fastapi',
-        'uvicorn',
-        'google-adk',
-        'redis',
-        'aiohttp',
-        'twilio'
+        ('fastapi', 'fastapi'),
+        ('uvicorn', 'uvicorn'),
+        ('google-adk', 'google.adk'),
+        ('redis', 'redis'),
+        ('aiohttp', 'aiohttp'),
+        ('twilio', 'twilio')
     ]
     
     missing_packages = []
-    for package in required_packages:
+    for package_name, import_name in required_packages:
         try:
-            __import__(package.replace('-', '_'))
+            __import__(import_name)
         except ImportError:
-            missing_packages.append(package)
+            missing_packages.append(package_name)
     
     if missing_packages:
         logger.error(f"Missing required packages: {missing_packages}")
@@ -132,7 +132,7 @@ async def test_agent_creation():
     logger.info("Testing agent creation...")
     
     try:
-        from app.agents.adk_agents_modular import create_root_agent
+        from app.agents.agent import create_root_agent
         
         logger.info("Creating root agent...")
         root_agent = await create_root_agent()

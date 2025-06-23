@@ -1,73 +1,56 @@
-# Core FastAPI dependencies
-fastapi[all]
-uvicorn[standard]
+# Core Dependencies
+fastapi
+uvicorn
+gunicorn
 pydantic
 pydantic-settings
 python-multipart
+anyio
+httpx
 aiohttp
 python-dotenv
 
-# Security and encryption
-cryptography
+# Web and Networking
+websockets
+httptools
+watchfiles
+pyyaml
+
+# OpenTelemetry
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-otlp
+opentelemetry-instrumentation
+opentelemetry-instrumentation-fastapi
+
+# Security
 python-jose[cryptography]
 passlib[bcrypt]
 PyJWT
 
-# Session management
-redis
-
-# Browser automation
-playwright
-browser-use
-langchain-google-genai
-
-# WhatsApp Web automation dependencies
-playwright[chromium]
-
-# Google ADK for multi-agent system
+# Google Services
 google-adk
+google-generativeai
 
-# Google Cloud services
-google-cloud-run
-google-cloud-monitoring
-google-cloud-logging
-google-cloud-translate
-google-cloud-firestore
-firebase-admin
-google-auth
-google-auth-oauthlib
+# WhatsApp Business API
+aiohttp
+requests
 
-# Language detection and processing
-langdetect
-
-# Communication
-twilio
+# Database
+supabase
 
 # Utilities
 requests
 psutil
-Pillow
-pandas
-numpy
-websockets
 
-# Testing
-pytest
-pytest-asyncio
-pytest-mock
-pytest-cov
-httpx
-
-# Rate limiting
+# Rate Limiting
 slowapi
 
-# Logging and monitoring
+# Logging
 structlog
-prometheus-client
-opentelemetry-api
-opentelemetry-sdk
-opentelemetry-instrumentation-fastapi
-opentelemetry-exporter-gcp-monitoring
+python-json-logger
 
-# Database
-supabase
+# Session Management
+redis
+browser-use
+playwright

@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  app:
+    image: danteindrex/uganda-egov-whatsapp:latest
+    container_name: uganda-egov-test-app
+    ports:
+      - "8080:8080"
+    environment:
+      # Core Application Settings
+      - ENVIRONMENT=development
+      - LOG_LEVEL=INFO
+      - DEBUG=true
+      - PORT_NO=8080
+      
+      # WhatsApp Business API Configuration (Test Values)
+      - WHATSAPP_PHONE_NUMBER_ID=test_phone_number_id
+      - WHATSAPP_ACCESS_TOKEN=test_access_token
+      - WHATSAPP_BUSINESS_ACCOUNT_ID=test_business_account_id
+      - WHATSAPP_APP_ID=test_app_id
+      - WHATSAPP_APP_SECRET=test_app_secret
+      - WHATSAPP_VERIFY_TOKEN=test_verify_token_12345
+      - WHATSAPP_WEBHOOK_SECRET=test_webhook_secret
+      
+      # Security Configuration
+      - JWT_SECRET_KEY=test_jwt_secret_key_minimum_32_characters_long_for_security
+      - ENCRYPTION_KEY=test_encryption_key_32_chars_long
+      
+      # Admin Configuration
+      - ADMIN_WHATSAPP_GROUP=test_admin_group
+      
+      # Redis Configuration
+      - REDIS_URL=redis://redis:6379
+      
+      # Google Services (Optional)
+      - GOOGLE_CLIENT_ID=test_google_client_id
+      - GOOGLE_API_KEY=test_google_api_key
+      
+      # Application Settings
+      - SESSION_TIMEOUT_MINUTES=30
+      - MAX_CONCURRENT_SESSIONS=100
+      - RATE_LIMIT_PER_MINUTE=60
+      - RATE_LIMIT_PER_HOUR=1000
+      
+      # Browser Automation Settings
+      - BROWSER_HEADLESS=true
+      - BROWSER_TIMEOUT=300
+      - BROWSER_MAX_RETRIES=3
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    volumes:
+      - app_logs:/app/logs
+      - app_tmp:/app/tmp
+
+  redis:
+    image: redis:7-alpine
+    container_name: uganda-egov-test-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  redis_data:
+  app_logs:
+  app_tmp:

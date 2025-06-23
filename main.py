@@ -9,9 +9,53 @@ import asyncio
 import logging
 import time
 import json
+"""
+Uganda E-Gov WhatsApp Helpdesk
+Multi-Agent AI System for Government Service Access
+Production-Optimized Version with Modular Architecture and Enhanced Browser Automation
+
+Key Components:
+1. FastAPI Web Framework
+2. WhatsApp Business API Integration
+3. OpenTelemetry for Monitoring
+4. ADK Agent System with Browser Automation
+5. Session Management
+6. Rate Limiting
+7. Caching Service
+8. Monitoring Service
+
+Architecture:
+- API Routes:
+  - WhatsApp Webhooks (/webhooks)
+  - Admin Interface (/admin)
+- Services:
+  - Session Management
+  - Cache Service
+  - Monitoring Service
+  - WhatsApp Client
+- Agent System:
+  - Root Agent Creation
+  - MCP Connection Management
+  - Browser Automation
+  
+Dependencies:
+- FastAPI
+- WhatsApp Business API
+- OpenTelemetry
+- Google ADK
+- SlowAPI
+- Uvicorn
+- Python-dotenv
+
+Environment Configuration:
+- Uses .env for configuration
+- Structured logging setup
+- CORS and GZip middleware
+- Rate limiting implementation
+"""
 from datetime import datetime
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, HTTPException, BackgroundTasks, Depends
+from fastapi import FastAPI, Request, HTTPException, BackgroundTasks, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -25,13 +69,14 @@ from dotenv import load_dotenv
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 # Import our custom modules
+from app.agents.mcp_servers import cleanup_mcp_connections
 from app.core.config import settings
 from app.core.logging_config import setup_logging
 from app.api.webhooks import whatsapp_router
 from app.api.admin import admin_router
 # ADK agent system - using modular architecture with enhanced browser automation
-from app.agents.adk_agents_modular import create_root_agent, cleanup_mcp_connections
-from app.services import twilio_client
+from app.agents.agent import create_root_agent, cleanup_mcp_connections
+
 from app.services.simple_session_manager import session_manager
 from app.services.server_cache_service import cache_service
 from app.services.simple_monitoring import MonitoringService
@@ -41,7 +86,7 @@ from google.adk import Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.events import Event
 from google.genai.types import Content, Part
-
+from google.genai import types 
 # Load environment variables
 load_dotenv()
 
@@ -233,9 +278,9 @@ async def web_whatsapp_webhook(request: Request, background_tasks: BackgroundTas
             "session_id": session_id if 'session_id' in locals() else None
         })
 
-@clone_app.post("/api/twilio/send")
-async def send_via_twilio(request: Request):
-    """Send message via Twilio WhatsApp API"""
+@clone_app.post("/api/whatsapp/send")
+async def send_via_whatsapp(request: Request):
+    """Send message via WhatsApp Business API"""
     try:
         body = await request.json()
         
@@ -246,26 +291,30 @@ async def send_via_twilio(request: Request):
         if not to_number or not message:
             raise HTTPException(status_code=400, detail="Missing 'to' or 'message' parameter")
         
-        # Ensure phone number format
-        if not to_number.startswith("+"):
-            to_number = f"+{to_number}"
+        # Ensure phone number format (remove + for WhatsApp API)
+        if to_number.startswith("+"):
+            to_number = to_number[1:]
         
-        # Send via your existing Twilio client
-        result = await twilio_client.send_text_message(to_number, message)
+        # Send via WhatsApp Business API client
+        from app.services.whatsapp_client import create_whatsapp_client
         
-        if result.get("status") == "success":
-            logger.info(f"Twilio message sent successfully to {to_number}")
+        async with create_whatsapp_client() as whatsapp_client:
+            result = await whatsapp_client.send_text_message(to_number, message)
+        
+        if result.get("messages"):
+            message_id = result["messages"][0]["id"]
+            logger.info(f"WhatsApp message sent successfully to {to_number}")
             return JSONResponse({
                 "status": "success",
-                "message_id": result.get("message_id"),
+                "message_id": message_id,
                 "to": to_number
             })
         else:
-            logger.error(f"Twilio send failed: {result.get('error')}")
-            raise HTTPException(status_code=500, detail=result.get("error", "Failed to send message"))
+            logger.error(f"WhatsApp send failed: {result}")
+            raise HTTPException(status_code=500, detail="Failed to send message")
             
     except Exception as e:
-        logger.error(f"Twilio API error: {e}")
+        logger.error(f"WhatsApp API error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @clone_app.get("/api/health")
@@ -277,7 +326,7 @@ async def health_check():
         "timestamp": datetime.now().isoformat(),
         "features": {
             "google_oauth": bool(os.getenv("GOOGLE_CLIENT_ID")),
-            "twilio_integration": bool(os.getenv("TWILIO_ACCOUNT_SID")),
+            "whatsapp_integration": bool(os.getenv("WHATSAPP_ACCESS_TOKEN")),
             "ai_backend": True
         }
     }
@@ -602,115 +651,257 @@ monitoring_service = None
 root_agent = None
 adk_runner = None
 
+import logging
+from typing import Any, Dict, Optional
+from google.adk.agents import Agent
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService # Assuming this or similar is used
+ # For message formatting
+
+# Assume these are defined globally or passed in during initialization
+# For demonstration, we'll mock them if they're not provided.
+# You should ensure 'adk_runner', 'root_agent', and 'monitoring_service'
+# are properly initialized where this function is called from.
+adk_runner: Optional[Runner] = None
+root_agent: Optional[Agent] = None
+monitoring_service: Any = None # Replace 'Any' with the actual type if known
+
+# Configure basic logging for better output
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+
 async def generate_simple_response(user_text: str, user_id: str) -> str:
     """Generate response using the ADK agent system with intelligent fallback"""
-    
+
     print(f"\n🔄 GENERATE_SIMPLE_RESPONSE CALLED:")
     print(f"   Input text: '{user_text}'")
     print(f"   User ID: '{user_id}'")
-    
+
+    # Normalize user ID (phone number)
+    normalized_user_id = user_id.strip()
+    if not normalized_user_id.startswith("256"):
+        normalized_user_id = f"256{normalized_user_id.lstrip('0')}"
+
+    print(f"   Normalized user ID: '{normalized_user_id}'")
+    logger.info(f"Processing message from {normalized_user_id}: {user_text[:100]}")
+
     try:
-        # Normalize user ID (phone number)
-        normalized_user_id = user_id.replace("whatsapp:", "").replace("+", "")
-        if not normalized_user_id.startswith("256"):
-            normalized_user_id = f"256{normalized_user_id.lstrip('0')}"
-        
-        print(f"   Normalized user ID: '{normalized_user_id}'")
-        
-        logger.info(f"Processing message from {normalized_user_id}: {user_text[:100]}")
-        
+        # --- ENSURE SESSION EXISTS FOR USER ---
+        print(f"\n🔧 ENSURING SESSION EXISTS FOR USER:")
+        try:
+            # Check if user has an active session in our session manager
+            existing_session = await session_manager.get_user_active_session(normalized_user_id)
+            
+            if not existing_session:
+                print(f"   📝 No active session found - creating new session for user")
+                # Create new session for the user
+                session_id = await session_manager.create_session(
+                    user_id=normalized_user_id,
+                    initial_data={
+                        "first_message": user_text,
+                        "created_via": "whatsapp_webhook",
+                        "user_phone": normalized_user_id
+                    }
+                )
+                print(f"   ✅ Created new session: {session_id}")
+                
+                # Log session creation
+                if monitoring_service:
+                    await monitoring_service.log_conversation_event({
+                        "event": "new_session_created",
+                        "user_id": normalized_user_id,
+                        "session_id": session_id,
+                        "trigger": "new_user_message"
+                    })
+            else:
+                print(f"   ✅ Found existing active session: {existing_session['session_id']}")
+                # Update session activity
+                await session_manager.add_message(
+                    existing_session['session_id'], 
+                    "user", 
+                    user_text,
+                    {"timestamp": datetime.now().isoformat()}
+                )
+                
+        except Exception as session_mgr_error:
+            print(f"   ⚠️  Session manager error: {session_mgr_error}")
+            logger.warning(f"Session manager error, continuing with ADK session handling: {session_mgr_error}")
+        # --- End Session Management ---
+
         # Check if ADK components are available
         print(f"\n🔍 CHECKING ADK SYSTEM AVAILABILITY:")
         print(f"   adk_runner available: {adk_runner is not None}")
         print(f"   root_agent available: {root_agent is not None}")
-        
+
         # Primary: Use ADK agent system for intelligent responses
         if adk_runner and root_agent:
             try:
                 print(f"✅ ADK system available - routing to intelligent agent")
                 logger.info("Routing to ADK agent system for intelligent processing")
+
+                # The session_id for a conversation. Often, user_id is sufficient for 1:1 user-session.
+                session_id_to_use = normalized_user_id
                 
-                print(f"🤖 CREATING ADK EVENT:")
+                # --- IMPROVED ADK SESSION HANDLING ---
+                # Always create new session for each interaction to avoid threading issues
+                print(f"   🔧 Creating fresh ADK session for user...")
+                try:
+                    # Create a unique session ID for this interaction
+                    unique_session_id = f"{normalized_user_id}_{int(time.time())}"
+                    
+                    # Create new ADK session
+                    session = await adk_runner.session_service.create_session(
+                        app_name=adk_runner.app_name,
+                        user_id=normalized_user_id,
+                        session_id=unique_session_id,
+                        state={
+                            "username": normalized_user_id, 
+                            "created_at": time.time(),
+                            "interaction_type": "whatsapp_message"
+                        }
+                    )
+                    session_id_to_use = unique_session_id
+                    print(f"   ✅ Created fresh ADK session: {session_id_to_use}")
+                        
+                except Exception as session_error:
+                    print(f"   ❌ ADK session creation failed: {session_error}")
+                    # Try with timestamp-based unique session ID as fallback
+                    fallback_session_id = f"fallback_{normalized_user_id}_{int(time.time() * 1000)}"
+                    print(f"   🔄 Trying with fallback session ID: {fallback_session_id}")
+                    try:
+                        session = await adk_runner.session_service.create_session(
+                            app_name=adk_runner.app_name,
+                            user_id=normalized_user_id,
+                            session_id=fallback_session_id,
+                            state={"username": normalized_user_id, "created_at": time.time()}
+                        )
+                        session_id_to_use = fallback_session_id
+                        print(f"   ✅ Fallback session created: {session_id_to_use}")
+                    except Exception as final_error:
+                        print(f"   ❌ Final session creation failed: {final_error}")
+                        raise final_error
                 
-                # Create event for ADK processing with enhanced context
-                event = Event(
-                    content=Content(parts=[Part(text=user_text)]),
-                    metadata={
-                        "user_id": normalized_user_id, 
-                        "source": "whatsapp",
-                        "timestamp": datetime.now().isoformat(),
-                        "session_type": "whatsapp_conversation"
-                    }
+                # Verify session was created
+                if session is None:
+                    raise ValueError(f"Failed to create ADK session: {session_id_to_use}")
+                # --- End Improved ADK Session Handling ---
+
+
+                print(f"🚀 CALLING ADK RUNNER:")
+                print(f"   User ID: {normalized_user_id}")
+                print(f"   Session ID for run: {session_id_to_use}")
+                print(f"   Session object: {session}")
+                print(f"   ADK Runner app_name: {adk_runner.app_name}")
+
+                # Create the message in a format ADK expects (google.generativeai.types.Content)
+                new_message_content = types.Content(
+                    role='user', parts=[types.Part(text=user_text)]
                 )
-                
-                print(f"   Event created with content: '{user_text}'")
-                print(f"   Event metadata: {event.metadata}")
-                
-                print(f"\n🚀 CALLING ADK RUNNER:")
-                print(f"   Session ID: {normalized_user_id}")
-                
-                # Process with ADK runner - let agents decide the response
-                response = await adk_runner.run(
-                    session_id=normalized_user_id,
-                    event=event
-                )
-                
-                print(f"📥 ADK RUNNER RESPONSE:")
-                print(f"   Response object: {response}")
-                print(f"   Response type: {type(response)}")
-                
-                if response:
-                    print(f"   Has content: {hasattr(response, 'content')}")
-                    if hasattr(response, 'content'):
-                        print(f"   Content: {response.content}")
-                        print(f"   Content type: {type(response.content)}")
+                print(f"   Message content created: {new_message_content}")
+
+                final_response_text = None
+                event_count = 0
+                try:
+                    async for event in adk_runner.run_async(
+                        user_id=normalized_user_id,
+                        session_id=session_id_to_use,
+                        new_message=new_message_content,
+                    ):
+                        event_count += 1
+                        print(f"   Event #{event_count}: {event.__class__.__name__}")
+                        if hasattr(event, 'content') and event.content:
+                            print(f"   Event content: {str(event.content)[:100]}...")
                         
-                        if response.content:
-                            print(f"   Has parts: {hasattr(response.content, 'parts')}")
-                            if hasattr(response.content, 'parts'):
-                                print(f"   Parts: {response.content.parts}")
-                                print(f"   Parts length: {len(response.content.parts) if response.content.parts else 0}")
-                
-                # Extract text from response
-                if response and hasattr(response, 'content') and response.content:
-                    if hasattr(response.content, 'parts') and response.content.parts:
-                        response_text = response.content.parts[0].text
-                        print(f"✅ ADK AGENT RESPONSE EXTRACTED:")
-                        print(f"   Response length: {len(response_text)} characters")
-                        print(f"   Response preview: {response_text[:200]}...")
-                        
-                        logger.info(f"ADK agent response generated successfully: {len(response_text)} chars")
-                        
-                        # Log successful agent processing
-                        if monitoring_service:
-                            await monitoring_service.log_conversation_event({
+                        if event.is_final_response():
+                            if event.content and event.content.parts:
+                                final_response_text = event.content.parts[0].text
+                                print(f"   ✅ Extracted final response text from event #{event_count}")
+                                break
+                            else:
+                                print(f"   ⚠️  Final response event has no content or parts")
+                    
+                    print(f"   📊 Total events processed: {event_count}")
+                except Exception as run_error:
+                    print(f"   ❌ Error during ADK runner execution:")
+                    print(f"   Error: {str(run_error)}")
+                    print(f"   Error type: {type(run_error).__name__}")
+                    
+                    # If it's a session not found error, try the synchronous approach
+                    if "Session not found" in str(run_error):
+                        print(f"   🔄 Trying synchronous runner as fallback...")
+                        try:
+                            # Use the synchronous run method which doesn't have thread issues
+                            events = adk_runner.run(
+                                user_id=normalized_user_id,
+                                session_id=session_id_to_use,
+                                new_message=new_message_content,
+                            )
+                            
+                            # Process events from synchronous run
+                            for event in events:
+                                event_count += 1
+                                print(f"   Sync Event #{event_count}: {event.__class__.__name__}")
+                                if hasattr(event, 'content') and event.content:
+                                    print(f"   Event content: {str(event.content)[:100]}...")
+                                
+                                if event.is_final_response():
+                                    if event.content and event.content.parts:
+                                        final_response_text = event.content.parts[0].text
+                                        print(f"   ✅ Extracted final response text from sync event #{event_count}")
+                                        break
+                                    else:
+                                        print(f"   ⚠️  Final response event has no content or parts")
+                            
+                            print(f"   📊 Total sync events processed: {event_count}")
+                            
+                        except Exception as sync_error:
+                            print(f"   ❌ Synchronous fallback also failed: {sync_error}")
+                            raise run_error  # Raise the original error
+                    else:
+                        raise run_error
+
+                if final_response_text:
+                    print(f"✅ ADK AGENT RESPONSE EXTRACTED:")
+                    print(f"   Response length: {len(final_response_text)} characters")
+                    print(f"   Response preview: {final_response_text[:200]}...")
+
+                    logger.info(
+                        f"ADK agent response generated successfully: {len(final_response_text)} chars"
+                    )
+
+                    if monitoring_service:
+                        await monitoring_service.log_conversation_event(
+                            {
                                 "event": "adk_agent_response",
                                 "user_id": normalized_user_id,
                                 "input_length": len(user_text),
-                                "output_length": len(response_text),
-                                "processing_method": "adk_agents"
-                            })
-                        
-                        return response_text
-                
-                print(f"⚠️  ADK agent returned empty or invalid response")
-                logger.warning("ADK agent returned empty response, using fallback")
-                
+                                "output_length": len(final_response_text),
+                                "processing_method": "adk_agents",
+                            }
+                        )
+                    return final_response_text
+                else:
+                    print(f"⚠️  ADK agent returned no final response with content.")
+                    logger.warning("ADK agent returned empty response, using fallback")
+
             except Exception as e:
                 print(f"❌ ADK AGENT ERROR:")
                 print(f"   Error: {str(e)}")
                 print(f"   Error type: {type(e).__name__}")
-                
+
                 import traceback
                 print(f"   Traceback: {traceback.format_exc()}")
-                
+
                 logger.error(f"ADK agent processing failed: {e}")
                 if monitoring_service:
-                    await monitoring_service.log_error_event("adk_agent_error", str(e), {
-                        "user_id": normalized_user_id,
-                        "input_text": user_text[:100]
-                    })
+                    await monitoring_service.log_error_event(
+                        "adk_agent_error",
+                        str(e),
+                        {"user_id": normalized_user_id, "input_text": user_text[:100]},
+                    )
                 # Continue to fallback
+
         else:
             print(f"⚠️  ADK system not available:")
             if not adk_runner:
@@ -718,26 +909,25 @@ async def generate_simple_response(user_text: str, user_id: str) -> str:
             if not root_agent:
                 print(f"   - root_agent is None")
             logger.warning("ADK agent system not available, using fallback responses")
-        
-        # Fallback: Simple emergency responses when agents are unavailable
+
         print(f"\n🔄 USING FALLBACK RESPONSE SYSTEM")
         logger.info("Using minimal fallback response system")
-        
-        # Log fallback usage for monitoring
+
         if monitoring_service:
-            await monitoring_service.log_conversation_event({
-                "event": "fallback_response_used",
-                "user_id": normalized_user_id,
-                "input_text": user_text[:100],
-                "processing_method": "fallback"
-            })
-        
-        # Minimal fallback - encourage agent system usage
-        fallback_response = f"""🇺🇬 Hello! I'm the Uganda E-Gov assistant.
+            await monitoring_service.log_conversation_event(
+                {
+                    "event": "fallback_response_used",
+                    "user_id": normalized_user_id,
+                    "input_text": user_text[:100],
+                    "processing_method": "fallback",
+                }
+            )
+
+        fallback_response = """🇺🇬 Hello! I'm the Uganda E-Gov assistant.
 
 I can help you with:
 • Birth Certificate (NIRA) - Check status with reference number
-• Tax Status (URA) - Check balance with TIN number  
+• Tax Status (URA) - Check balance with TIN number
 • NSSF Balance - Check contributions with membership number
 • Land Verification (NLIS) - Verify ownership with plot details
 
@@ -755,28 +945,28 @@ How can I assist you today?"""
         print(f"📤 FALLBACK RESPONSE GENERATED:")
         print(f"   Length: {len(fallback_response)} characters")
         print(f"   Preview: {fallback_response[:200]}...")
-        
+
         return fallback_response
 
     except Exception as e:
-        print(f"\n❌ GENERATE_SIMPLE_RESPONSE ERROR:")
+        print(f"\n❌ GENERATE_SIMPLE_RESPONSE TOP-LEVEL ERROR:")
         print(f"   Error: {str(e)}")
         print(f"   Error type: {type(e).__name__}")
-        
+
         import traceback
         print(f"   Traceback: {traceback.format_exc()}")
-        
-        logger.error(f"Error generating response: {e}")
-        
-        error_response = """Hello! I'm the Uganda E-Gov assistant. 
+
+        logger.error(f"Top-level error generating response: {e}")
+
+        error_response = """Hello! I'm the Uganda E-Gov assistant.
 
 I can help you with government services like birth certificates, tax status, NSSF balance, and land verification.
 
 How can I assist you today?"""
 
-        print(f"📤 ERROR RESPONSE GENERATED:")
+        print(f"📤 FINAL ERROR RESPONSE GENERATED:")
         print(f"   Length: {len(error_response)} characters")
-        
+
         return error_response
 
 async def _validate_services():
@@ -840,6 +1030,7 @@ async def lifespan(app: FastAPI):
             print("   Creating ADK session service...")
             adk_session_service = InMemorySessionService()
             print(f"   ✅ Session service created: {adk_session_service}")
+            print(f"   Session service type: {type(adk_session_service)}")
             
             print("   Creating ADK runner...")
             adk_runner = Runner(
@@ -848,6 +1039,38 @@ async def lifespan(app: FastAPI):
                 session_service=adk_session_service
             )
             print(f"   ✅ ADK runner created: {adk_runner}")
+            print(f"   ADK runner app_name: {adk_runner.app_name}")
+            print(f"   ADK runner session_service: {adk_runner.session_service}")
+            print(f"   ADK runner agent: {adk_runner.agent}")
+            
+            # Test session service functionality
+            print("   🧪 Testing session service...")
+            try:
+                test_session_id = "test_session_123"
+                test_user_id = "test_user_123"
+                
+                # Try to create a test session
+                test_session = await adk_runner.session_service.create_session(
+                    app_name=adk_runner.app_name,
+                    user_id=test_user_id,
+                    session_id=test_session_id,
+                    state={"test": True}
+                )
+                print(f"   ✅ Test session created successfully: {test_session}")
+                
+                # Try to get the test session
+                retrieved_session = await adk_runner.session_service.get_session(
+                    app_name=adk_runner.app_name,
+                    user_id=test_user_id,
+                    session_id=test_session_id
+                )
+                print(f"   ✅ Test session retrieved successfully: {retrieved_session}")
+                
+                print("   ✅ Session service test passed!")
+                
+            except Exception as test_error:
+                print(f"   ❌ Session service test failed: {test_error}")
+                print(f"   This may cause issues with ADK runner execution")
             
             init_time = time.time() - start_time
             await monitoring_service.log_conversation_event({"event": "agent_initialization", "duration": init_time, "status": "success"})
@@ -975,6 +1198,9 @@ async def monitor_requests(request: Request, call_next):
 # Include routers
 app.include_router(admin_router, prefix="/admin", tags=["Admin"])
 
+# Remove old webhook endpoint
+app.router.routes = [route for route in app.router.routes if route.name != 'send_via_whatsapp']
+
 # Add static file serving for admin dashboard
 from fastapi.staticfiles import StaticFiles
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -987,15 +1213,33 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 whatsapp_web_client = None
 
 # Update webhook endpoint
-# Fixed webhook function
-# Simplified webhook function
+@app.get("/whatsapp/webhook")
+async def verify_whatsapp_webhook(
+    request: Request,
+    hub_mode: str = Query(alias="hub.mode", default=None),
+    hub_verify_token: str = Query(alias="hub.verify_token", default=None),
+    hub_challenge: str = Query(alias="hub.challenge", default=None)
+):
+    """Verify WhatsApp Business API webhook"""
+    print(f"\n🔍 WEBHOOK VERIFICATION REQUEST:")
+    print(f"   Mode: {hub_mode}")
+    print(f"   Token: {hub_verify_token}")
+    print(f"   Challenge: {hub_challenge}")
+    
+    if hub_mode == "subscribe" and hub_verify_token == settings.WHATSAPP_VERIFY_TOKEN:
+        print(f"✅ Webhook verification successful")
+        return PlainTextResponse(hub_challenge)
+    else:
+        print(f"❌ Webhook verification failed")
+        raise HTTPException(status_code=403, detail="Verification failed")
+
 @app.post("/whatsapp/webhook")
 async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
-    """Enhanced WhatsApp webhook endpoint with comprehensive logging"""
+    """Enhanced WhatsApp Business API webhook endpoint with comprehensive logging"""
     start_time = time.time()
     
     print("\n" + "="*80)
-    print("🔔 WEBHOOK REQUEST RECEIVED")
+    print("🔔 WHATSAPP WEBHOOK REQUEST RECEIVED")
     print("="*80)
     
     try:
@@ -1004,72 +1248,161 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
         print(f"🕐 Timestamp: {datetime.now().isoformat()}")
         print(f"📋 Headers: {dict(request.headers)}")
         
-        # Try to get form data
-        body = {}
+        # Get raw body for signature verification
+        raw_body = await request.body()
         content_type = request.headers.get("content-type", "")
         print(f"📄 Content-Type: {content_type}")
         
+        # Parse JSON payload
         try:
-            if "application/json" in content_type:
-                body = await request.json()
-                print("📦 Parsed as JSON")
-            else:
+            body = json.loads(raw_body) if raw_body else {}
+            print("📦 Parsed as JSON")
+        except json.JSONDecodeError as e:
+            print(f"⚠️  JSON parse error: {e}")
+            # Try form data as fallback
+            try:
                 form = await request.form()
                 body = dict(form)
-                print("📦 Parsed as form data")
-        except Exception as parse_error:
-            print(f"⚠️  Parse error: {parse_error}")
-            # Try raw body
-            try:
-                raw_body = await request.body()
-                print(f"📄 Raw body: {raw_body.decode('utf-8', errors='ignore')[:500]}")
+                print("📦 Parsed as form data (fallback)")
             except:
-                pass
-            body = {}
+                body = {}
         
         print(f"📊 Request body: {json.dumps(body, indent=2)}")
         
-        # Handle webhook verification (common for setup)
-        if "hub.challenge" in body:
-            challenge = body["hub.challenge"]
-            print(f"✅ Webhook verification - returning challenge: {challenge}")
-            return PlainTextResponse(challenge)
+        # Handle webhook verification for WhatsApp Business API
+        if "hub.challenge" in body or request.query_params.get("hub.challenge"):
+            challenge = body.get("hub.challenge") or request.query_params.get("hub.challenge")
+            mode = body.get("hub.mode") or request.query_params.get("hub.mode")
+            token = body.get("hub.verify_token") or request.query_params.get("hub.verify_token")
+            
+            print(f"✅ Webhook verification - mode: {mode}, token: {token}, challenge: {challenge}")
+            
+            # Verify token matches our configured token
+            if mode == "subscribe" and token == settings.WHATSAPP_VERIFY_TOKEN:
+                print(f"✅ Token verified - returning challenge: {challenge}")
+                return PlainTextResponse(challenge)
+            else:
+                print(f"❌ Token verification failed")
+                return PlainTextResponse("Verification failed", status_code=403)
         
-        # Extract message and sender from various formats
-        user_text = "Hello"  # Default message
-        user_id = "user"     # Default user
+        # Extract message and sender from WhatsApp Business API format
+        user_text = None
+        user_id = None
         
-        print("\n🔍 EXTRACTING MESSAGE DATA:")
+        print("\n🔍 EXTRACTING WHATSAPP MESSAGE DATA:")
         
-        # Try different field combinations
-        if "Body" in body:
-            user_text = body["Body"]
-            print(f"📝 Found Body: {user_text}")
-        elif "message" in body:
-            user_text = body["message"]
-            print(f"📝 Found message: {user_text}")
-        elif "text" in body:
-            user_text = body["text"]
-            print(f"📝 Found text: {user_text}")
-        else:
-            print(f"⚠️  No message field found, using default: {user_text}")
+        # Process WhatsApp Business API webhook payload
+        if "entry" in body:
+            for entry in body["entry"]:
+                if "changes" in entry:
+                    for change in entry["changes"]:
+                        if change.get("field") == "messages":
+                            value = change.get("value", {})
+                            
+                            # Process incoming messages
+                            if "messages" in value:
+                                for message in value["messages"]:
+                                    user_id = message.get("from")
+                                    message_type = message.get("type")
+                                    
+                                    # Extract text based on message type
+                                    if message_type == "text":
+                                        user_text = message.get("text", {}).get("body", "")
+                                    elif message_type == "button":
+                                        user_text = message.get("button", {}).get("text", "")
+                                    elif message_type == "interactive":
+                                        interactive = message.get("interactive", {})
+                                        if interactive.get("type") == "button_reply":
+                                            user_text = interactive.get("button_reply", {}).get("title", "")
+                                        elif interactive.get("type") == "list_reply":
+                                            user_text = interactive.get("list_reply", {}).get("title", "")
+                                    
+                                    print(f"📝 Found WhatsApp message: {user_text}")
+                                    print(f"👤 From user: {user_id}")
+                                    print(f"📱 Message type: {message_type}")
+                                    
+                                    # Process only the first message
+                                    break
+                            
+                            # If we found a message, break out of loops
+                            if user_text and user_id:
+                                break
+                    
+                    if user_text and user_id:
+                        break
         
-        if "From" in body:
-            user_id = body["From"]
-            print(f"👤 Found From: {user_id}")
-        elif "sender" in body:
-            user_id = body["sender"]
-            print(f"👤 Found sender: {user_id}")
-        elif "from" in body:
-            user_id = body["from"]
-            print(f"👤 Found from: {user_id}")
-        else:
-            print(f"⚠️  No sender field found, using default: {user_id}")
+        # Fallback to legacy format for compatibility
+        if not user_text or not user_id:
+            print("\n🔄 TRYING LEGACY FORMAT:")
+            
+            if "Body" in body:
+                user_text = body["Body"]
+                print(f"📝 Found Body: {user_text}")
+            elif "message" in body:
+                user_text = body["message"]
+                print(f"📝 Found message: {user_text}")
+            elif "text" in body:
+                user_text = body["text"]
+                print(f"📝 Found text: {user_text}")
+            
+            if "From" in body:
+                user_id = body["From"]
+                print(f"👤 Found From: {user_id}")
+            elif "sender" in body:
+                user_id = body["sender"]
+                print(f"👤 Found sender: {user_id}")
+            elif "from" in body:
+                user_id = body["from"]
+                print(f"👤 Found from: {user_id}")
+        
+        # Use defaults if still not found
+        if not user_text:
+            user_text = "Hello"
+            print(f"⚠️  No message found, using default: {user_text}")
+        
+        if not user_id:
+            user_id = "user"
+            print(f"⚠️  No sender found, using default: {user_id}")
         
         print(f"\n🎯 FINAL EXTRACTED DATA:")
         print(f"   Message: '{user_text}'")
         print(f"   User ID: '{user_id}'")
         
+        
+        # Ensure session exists for this user before generating response
+        print(f"\n🔧 ENSURING USER SESSION EXISTS:")
+        try:
+            # Check if user has an active session
+            existing_session = await session_manager.get_user_active_session(user_id)
+            
+            if not existing_session:
+                print(f"   📝 Creating new session for WhatsApp user: {user_id}")
+                session_id = await session_manager.create_session(
+                    user_id=user_id,
+                    initial_data={
+                        "first_message": user_text,
+                        "created_via": "whatsapp_webhook",
+                        "source": "whatsapp_business_api",
+                        "user_phone": user_id
+                    }
+                )
+                print(f"   ✅ Created session: {session_id}")
+                
+                # Log new user session creation
+                if monitoring_service:
+                    await monitoring_service.log_conversation_event({
+                        "event": "new_whatsapp_user_session",
+                        "user_id": user_id,
+                        "session_id": session_id,
+                        "first_message": user_text[:100]
+                    })
+            else:
+                print(f"   ✅ Using existing session: {existing_session['session_id']}")
+                
+        except Exception as session_error:
+            print(f"   ⚠️  Session creation error: {session_error}")
+            logger.warning(f"Failed to create session for user {user_id}: {session_error}")
+
         # Generate response with detailed logging
         print(f"\n🤖 GENERATING RESPONSE:")
         print(f"   Calling generate_simple_response...")
@@ -1080,27 +1413,31 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
         print(f"📝 Response length: {len(response_text)} characters")
         print(f"📄 Response preview: {response_text[:200]}...")
         
-        # Send response back to WhatsApp via WhatsApp Web
+        # Send response back to WhatsApp via WhatsApp Business API
         print(f"\n📱 SENDING WHATSAPP RESPONSE:")
         print(f"   To: {user_id}")
         print(f"   Message: {response_text[:100]}...")
         
         try:
-            if whatsapp_web_client and whatsapp_web_client.is_authenticated:
-                # Send the response back to WhatsApp
-                send_result = await whatsapp_web_client.send_text_message(user_id, response_text)
+            from app.services.whatsapp_client import create_whatsapp_client
+            
+            # Ensure phone number format (remove whatsapp: prefix if present)
+            clean_user_id = user_id.replace("whatsapp:", "")
+            if clean_user_id.startswith("+"):
+                clean_user_id = clean_user_id[1:]
+            
+            async with create_whatsapp_client() as whatsapp_client:
+                send_result = await whatsapp_client.send_text_message(clean_user_id, response_text)
                 
-                if send_result.get("status") == "success":
+                if send_result.get("messages"):
+                    message_id = send_result["messages"][0]["id"]
                     print(f"   ✅ WhatsApp message sent successfully!")
-                    print(f"   📧 Message ID: {send_result.get('message_id')}")
+                    print(f"   📧 Message ID: {message_id}")
                     whatsapp_status = "sent"
                 else:
                     print(f"   ❌ Failed to send WhatsApp message:")
-                    print(f"   Error: {send_result.get('error')}")
+                    print(f"   Error: {send_result}")
                     whatsapp_status = "failed"
-            else:
-                print(f"   ❌ WhatsApp Web client not available or not authenticated")
-                whatsapp_status = "not_authenticated"
                 
         except Exception as send_error:
             print(f"   ❌ WhatsApp sending error:")

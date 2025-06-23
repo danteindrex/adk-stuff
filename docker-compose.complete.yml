@@ -1,0 +1,257 @@
+version: '3.8'
+
+services:
+  # Complete Uganda E-Gov App with built-in Redis
+  app-complete:
+    build: 
+      context: .
+      dockerfile: Dockerfile.complete
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    container_name: uganda-egov-complete
+    hostname: uganda-egov-complete
+    ports:
+      - "8080:8080"
+    environment:
+      # Core application settings
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      
+      # Redis configuration (built-in)
+      - REDIS_URL=redis://localhost:6379
+      
+      # WhatsApp Business API configuration
+      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-your_phone_number_id}
+      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-your_access_token}
+      - WHATSAPP_BUSINESS_ACCOUNT_ID=${WHATSAPP_BUSINESS_ACCOUNT_ID:-your_business_account_id}
+      - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-your_verify_token}
+      - WHATSAPP_WEBHOOK_SECRET=${WHATSAPP_WEBHOOK_SECRET:-your_webhook_secret}
+      
+      # API and security
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-your_google_api_key}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your_jwt_secret_key_change_this_in_production}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-your_encryption_key_change_this_in_production}
+      
+      # Application settings
+      - ADMIN_WHATSAPP_GROUP=${ADMIN_WHATSAPP_GROUP:-admin_group_id}
+      - SESSION_TIMEOUT_MINUTES=30
+      - MAX_CONCURRENT_SESSIONS=1000
+      - RATE_LIMIT_PER_MINUTE=60
+      - RATE_LIMIT_PER_HOUR=1000
+      
+      # Browser automation settings
+      - BROWSER_HEADLESS=true
+      - BROWSER_TIMEOUT=300
+      - BROWSER_MAX_RETRIES=3
+      - BROWSER_USE_MODEL=gemini-2.0-flash-exp
+      - PLAYWRIGHT_BROWSERS_PATH=/home/appuser/.cache/ms-playwright/
+      
+      # Supabase configuration (optional)
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
+    restart: unless-stopped
+    # Resource constraints
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 3G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    # Volume mounts for persistence
+    volumes:
+      - app_logs:/app/logs
+      - app_tmp:/app/tmp
+      - browser_cache:/home/appuser/.cache/ms-playwright
+      - redis_data:/var/lib/redis
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    # Configure logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Add tmpfs for temporary files
+    tmpfs:
+      - /tmp
+      - /var/tmp
+
+  # Separate Redis service (alternative to built-in Redis)
+  redis-external:
+    image: redis:7-alpine
+    container_name: uganda-egov-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_external_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    profiles:
+      - external-redis
+
+  # App with external Redis (alternative configuration)
+  app-external-redis:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    container_name: uganda-egov-external-redis
+    hostname: uganda-egov-external-redis
+    ports:
+      - "8081:8080"
+    environment:
+      # Core application settings
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      
+      # Redis configuration (external)
+      - REDIS_URL=redis://redis-external:6379
+      
+      # WhatsApp Business API configuration
+      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-your_phone_number_id}
+      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-your_access_token}
+      - WHATSAPP_BUSINESS_ACCOUNT_ID=${WHATSAPP_BUSINESS_ACCOUNT_ID:-your_business_account_id}
+      - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-your_verify_token}
+      - WHATSAPP_WEBHOOK_SECRET=${WHATSAPP_WEBHOOK_SECRET:-your_webhook_secret}
+      
+      # API and security
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-your_google_api_key}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your_jwt_secret_key_change_this_in_production}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-your_encryption_key_change_this_in_production}
+      
+      # Application settings
+      - ADMIN_WHATSAPP_GROUP=${ADMIN_WHATSAPP_GROUP:-admin_group_id}
+      - SESSION_TIMEOUT_MINUTES=30
+      - MAX_CONCURRENT_SESSIONS=1000
+      - RATE_LIMIT_PER_MINUTE=60
+      - RATE_LIMIT_PER_HOUR=1000
+      
+      # Browser automation settings
+      - BROWSER_HEADLESS=true
+      - BROWSER_TIMEOUT=300
+      - BROWSER_MAX_RETRIES=3
+      - BROWSER_USE_MODEL=gemini-2.0-flash-exp
+      - PLAYWRIGHT_BROWSERS_PATH=/home/appuser/.cache/ms-playwright/
+    depends_on:
+      redis-external:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - external-redis
+    # Resource constraints
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    volumes:
+      - app_external_logs:/app/logs
+      - app_external_tmp:/app/tmp
+      - browser_external_cache:/home/appuser/.cache/ms-playwright
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    tmpfs:
+      - /tmp
+      - /var/tmp
+
+  # Monitoring services (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: uganda-egov-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: uganda-egov-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin123}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+volumes:
+  # Complete setup volumes
+  app_logs:
+    driver: local
+  app_tmp:
+    driver: local
+  browser_cache:
+    driver: local
+  redis_data:
+    driver: local
+  
+  # External Redis setup volumes
+  redis_external_data:
+    driver: local
+  app_external_logs:
+    driver: local
+  app_external_tmp:
+    driver: local
+  browser_external_cache:
+    driver: local
+  
+  # Monitoring volumes
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  default:
+    name: uganda-egov-network
+    driver: bridge

@@ -2,22 +2,20 @@
 Land Records Agent
 Handles NLIS (National Land Information System) services
 """
-
+from ..mcp_servers.browser_use_tools import automate_government_portal
 import logging
 from google.adk.agents import LlmAgent
-from ..mcp_servers.internal_mcp_tools import get_government_portal_tools, get_internal_browser_tools
-
+from google.adk.tools import FunctionTool
+from ..mcp_servers.mcp_tools import mcp_playwright
+browser_tools = mcp_playwright()
+portal_tools = FunctionTool(automate_government_portal)
 logger = logging.getLogger(__name__)
-
+all_tools=[browser_tools,portal_tools]
 async def create_land_agent():
     """Create land verification agent with enhanced automation tools"""
     try:
         # Get both general automation tools and government-specific tools
-        browser_tools = await get_internal_browser_tools()
-        portal_tools = await get_government_portal_tools()
         
-        # Combine all tools
-        all_tools = browser_tools + portal_tools
         
         agent = LlmAgent(
             name="land_agent",

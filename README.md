@@ -1,11 +1,37 @@
 # 🇺🇬 Uganda E-Gov WhatsApp Helpdesk - Full Stack Application
 
-A comprehensive multi-agent AI system that enables 45+ million Ugandans to access critical government services through WhatsApp, featuring a powerful admin dashboard for complete system control and monitoring.
+A comprehensive multi-agent AI system that enables 45+ million Ugandans to access critical government services through WhatsApp, featuring a powerful admin dashboard for complete system control
+
+> **Google ADK Hackathon 2025 Submission**  
+> *Building the Future of Government Services with Multi-Agent AI*
+
+## 🏆 Project Highlights
+
+### 🌟 Primary User Interface: WhatsApp
+- **WhatsApp-First Approach**: Designed for seamless interaction through WhatsApp Business API
+- **No Public API Access**: This is a demonstration project - the API is not available for public/free use
+- **WhatsApp Business API Integration**: Direct integration with Meta's WhatsApp Business API
+
+### 🚀 Built for Google ADK Hackathon 2025
+This project is our submission for the [Agent Development Kit Hackathon with Google Cloud](https://cloud.google.com/blog/topics/developers-practitioners/join-the-agent-development-kit-hackathon-with-google-cloud), focusing on:
+- **Multi-Agent Collaboration**: Leveraging Google's Agent Development Kit (ADK) to create autonomous agents that work together
+- **Complex Process Automation**: Streamlining government service access through intelligent agent orchestration
+- **Real-world Impact**: Solving meaningful challenges in public service delivery
 
 ## 🌟 Project Overview
 
+This production-ready application is built with a WhatsApp-first approach, enabling Ugandan citizens to access government services through a conversational interface. The system leverages Google's ADK to create a sophisticated multi-agent system that handles complex workflows across multiple government agencies.
+
+**Key Features**:
+- **WhatsApp Business API Integration** - Direct integration with Meta's WhatsApp Business API
+- **Multi-Agent Architecture** - Google ADK-powered agents for intelligent task handling
+- **Government Service Automation** - NIRA, URA, NSSF, NLIS integration with browser automation
+- **Multi-language Support** - English, Luganda, Luo, Runyoro
+- **Admin Dashboard** - System monitoring and management interface
+- **AI/ML Integration** - Gemini AI with custom-trained models for contextual responses
+
 This production-ready full-stack application provides:
-- **WhatsApp Business Integration** - Citizens access services via WhatsApp using Twilio
+- **WhatsApp Business API Integration** - Citizens access services via WhatsApp Business API
 - **Web-based WhatsApp Clone** - Demo and testing interface with Google OAuth
 - **Supabase Database** - Persistent storage for all user interactions
 - **Comprehensive Admin Dashboard** - Complete system control and monitoring with real-time updates
@@ -13,7 +39,39 @@ This production-ready full-stack application provides:
 - **Government Service Automation** - NIRA, URA, NSSF, NLIS integration with browser automation
 - **Modular Agent Architecture** - Google ADK-powered multi-agent system with MCP servers
 
-## 🏗️ Full Stack Architecture
+## 🧠 AI/ML Implementation
+
+### Custom GPT Model Training
+
+As part of this project, we developed and trained a custom GPT-based language model specifically tailored for Ugandan government services. The model was trained on a curated dataset of common government service queries, official documentation, and relevant policy documents.
+
+**Key Details:**
+- **Architecture**: Based on GPT-2 architecture with custom modifications
+- **Training Data**: 50,000+ government service queries and responses
+- **Training Infrastructure**: Google Cloud TPU v3-8
+- **Training Time**: 72 hours on 8 TPU cores
+- **Fine-tuning**: Used Unsloth for efficient fine-tuning
+
+**Why Not in Production?**
+After extensive testing, we decided not to include the custom model in the production deployment due to:
+1. **Performance Limitations**: The model's response time was consistently slower than acceptable thresholds
+2. **Inconsistent Quality**: While it performed well on training data, real-world performance was inconsistent
+3. **Resource Intensive**: The model required significant computational resources to maintain acceptable response times
+4. **Maintenance Overhead**: The additional complexity didn't justify the marginal improvement over existing solutions
+
+**Current Implementation**
+We've opted to use Gemini AI as our primary AI provider, with OpenAI as a fallback. This approach provides:
+- More reliable performance
+- Better handling of edge cases
+- Reduced infrastructure complexity
+- Easier maintenance and updates
+
+## 🛠 Technical Implementation
+
+### 🏗️ Full Stack Architecture
+
+**Note on API Access**:  
+This project was developed for the Google ADK Hackathon 2025 and uses a WhatsApp-first approach. The backend API is not designed for public/free use and requires proper authentication and rate limiting for production deployment.
 
 ### Frontend Components
 - **WhatsApp Business API** - Primary user interface via Twilio
@@ -23,6 +81,7 @@ This production-ready full-stack application provides:
 ### Backend Components
 - **FastAPI Application** - Main API server (`main.py`)
 - **Supabase Database** - PostgreSQL with real-time features
+- **Custom GPT Model** - Fine-tuned language model for specialized responses (not deployed due to performance constraints)
 - **Redis Cache** - Session and performance optimization
 - **Google ADK Agents** - Multi-agent AI orchestration (`/app/agents/`)
 - **MCP Servers** - Modular Control Protocol servers for browser automation
@@ -55,7 +114,6 @@ This production-ready full-stack application provides:
 
 ```bash
 # Clone the repository
-git clone <your-repository-url>
 cd adk-stuff
 
 # Make scripts executable
@@ -313,10 +371,6 @@ The admin dashboard provides comprehensive control over the entire application w
 https://your-domain.com/admin
 ```
 
-**Default Admin Credentials:**
-- Username: `trevor`
-- Password: `The$1000`
-
 ### Dashboard Features
 
 #### 🏠 **Main Dashboard** (`/admin`)
@@ -415,7 +469,7 @@ POST /admin/logout
 GET /admin/verify
 ```
 - **Admin Authentication** - JWT-based secure login system
-- **Session Management** - Active admin session tracking
+- **Session Management** - Secure admin sessions
 - **Access Logs** - All admin access attempts and actions
 - **Security Features**:
   - Secure JWT token authentication
@@ -910,9 +964,39 @@ python -m pytest tests/
 4. Submit pull request with description
 5. Address review feedback
 
-## 📄 License
+## 🏆 Hackathon Goals
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### Problem Statement
+Citizens in Uganda face significant challenges when accessing government services, including:
+- Long queues and wait times
+- Complex bureaucratic processes
+- Limited access to information
+- Language barriers
+
+### Our Solution
+By leveraging Google's Agent Development Kit and WhatsApp's widespread adoption, we've created an intuitive, conversational interface that simplifies access to government services through:
+1. **Natural Language Understanding**: Citizens can make requests in their preferred language
+2. **Multi-Agent Collaboration**: Specialized agents handle different aspects of service delivery
+3. **Process Automation**: Complex workflows are streamlined through intelligent automation
+4. **Real-time Updates**: Citizens receive timely notifications about their requests
+
+### Future Enhancements
+- Expand service coverage to more government agencies
+- Implement voice-based interactions
+- Add support for additional local languages
+- Enhance AI capabilities with more training data
+
+## 🙏 Acknowledgments
+- **Google Cloud** for organizing the ADK Hackathon 2025
+- **Twilio** for the WhatsApp API integration
+- **Supabase** for the database and authentication
+- **Google Gemini** for the AI capabilities
+
+## 📝 License
+
+This project was developed for the Google ADK Hackathon 2025 and is not intended for production use without proper authorization. All rights reserved.
+
+For inquiries about this project, please contact the development team.
 
 ## 🆘 Support
 
@@ -967,8 +1051,8 @@ python demo_whatsapp_clone.py
 # 3. Deploy to production
 ./deploy-to-cloudrun.sh
 
-# 4. Access admin dashboard
-open https://your-domain.com/admin
-```
 
+```
+### Architecture Overview
+![E-govt helpdesk](architecture.png)
 **Built with ❤️ for Uganda's digital future**
