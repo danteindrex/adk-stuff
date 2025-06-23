@@ -65,7 +65,8 @@ async def create_intent_agent():
             5. Route to the appropriate service agent
             """,
             description="Classifies user intent and routes requests to appropriate service agents.",
-            tools=intent_tools
+            tools=intent_tools,
+            sub_agents=[birth_agent,tax_agent,nssf_agent,land_agent,form_agent]
         )
         
         logger.info("Intent classification agent created successfully")

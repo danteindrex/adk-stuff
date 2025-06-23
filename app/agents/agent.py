@@ -5,8 +5,21 @@ Modular architecture with enhanced browser automation and fallback mechanisms
 
 import logging
 import asyncio
+from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParameters
 from google.adk.agents import LlmAgent
 from google.adk.tools import FunctionTool
+from app.agents.core_agents import language_agent
+from app.agents.mcp_servers.browser_use_tools import automate_government_portal
+browser_tool=FunctionTool(automate_government_portal)
+mcp-playwright = MCPToolset(
+                    connection_params=StdioConnectionParams(
+                        command="npx",
+                        args=[
+                            "-y", 
+                            "@modelcontextprotocol/server-playwright@latest"
+                        ]
+                    )
+                )
 
 # Import modular components
 from app.agents.mcp_servers import cleanup_mcp_connections
@@ -18,7 +31,7 @@ from .core_agents import (
     create_help_agent
 )
 from .service_agents import create_service_dispatcher
-
+all_tools = [browser_tool,mcp-playwright]
 logger = logging.getLogger(__name__)
 
 async def create_root_agent():
@@ -27,10 +40,10 @@ async def create_root_agent():
         logger.info("Creating intelligent root agent with direct input processing...")
         
         # Get core automation tools only
-        automation_tools = await get_all_internal_tools()
+       
         
         # Use only automation tools - LLM handles everything else
-        all_tools = automation_tools
+        
         
         # Create intelligent root LLM agent
         root_agent = LlmAgent(
@@ -113,7 +126,12 @@ You have TWO powerful automation tools:
 
 Your goal: Be the bridge between citizens and government websites - navigate the complexity for them and deliver simple, clear answers.""",
             description="Intelligent root agent with full autonomy for handling Uganda government service requests through WhatsApp.",
-            tools=all_tools
+            tools=all_tools,
+            sub_agents=[create_auth_agent(),
+    create_language_agent(),
+    create_intent_agent(),
+    create_help_agent()
+]
         )
         
         logger.info("Intelligent root agent created successfully with direct input processing")
@@ -123,67 +141,3 @@ Your goal: Be the bridge between citizens and government websites - navigate the
         logger.error(f"Failed to create intelligent root agent: {e}")
         raise
 
-# Coordination tools removed - LLM handles all logic with just the two core automation tools
-
-# Backward compatibility functions
-async def create_auth_agent_compat():
-    """Backward compatibility wrapper for auth agent"""
-    return await create_auth_agent()
-
-async def create_language_agent_compat():
-    """Backward compatibility wrapper for language agent"""
-    return await create_language_agent()
-
-async def create_intent_agent_compat():
-    """Backward compatibility wrapper for intent agent"""
-    return await create_intent_agent()
-
-async def create_birth_agent_compat():
-    """Backward compatibility wrapper for birth agent"""
-    from .service_agents.birth_agent import create_birth_agent
-    return await create_birth_agent()
-
-async def create_tax_agent_compat():
-    """Backward compatibility wrapper for tax agent"""
-    from .service_agents.tax_agent import create_tax_agent
-    return await create_tax_agent()
-
-async def create_nssf_agent_compat():
-    """Backward compatibility wrapper for NSSF agent"""
-    from .service_agents.nssf_agent import create_nssf_agent
-    return await create_nssf_agent()
-
-async def create_land_agent_compat():
-    """Backward compatibility wrapper for land agent"""
-    from .service_agents.land_agent import create_land_agent
-    return await create_land_agent()
-
-async def create_form_agent_compat():
-    """Backward compatibility wrapper for form agent"""
-    from .service_agents.form_agent import create_form_agent
-    return await create_form_agent()
-
-async def create_help_agent_compat():
-    """Backward compatibility wrapper for help agent"""
-    return await create_help_agent()
-
-async def create_service_dispatcher_compat():
-    """Backward compatibility wrapper for service dispatcher"""
-    return await create_service_dispatcher()
-
-# Export main functions
-__all__ = [
-    'create_root_agent',
-    'cleanup_mcp_connections',
-    # Backward compatibility
-    'create_auth_agent_compat',
-    'create_language_agent_compat',
-    'create_intent_agent_compat',
-    'create_birth_agent_compat',
-    'create_tax_agent_compat',
-    'create_nssf_agent_compat',
-    'create_land_agent_compat',
-    'create_form_agent_compat',
-    'create_help_agent_compat',
-    'create_service_dispatcher_compat'
-]

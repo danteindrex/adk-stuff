@@ -65,7 +65,8 @@ async def create_language_agent():
             4. Ensure responses are in the user's preferred language
             """,
             description="Detects user language and provides translation services for multi-language support.",
-            tools=language_tools
+            tools=language_tools,
+            sub_agents=[create_intent_agent]
         )
         
         logger.info("Language agent created successfully")

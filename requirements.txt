@@ -3,6 +3,7 @@ fastapi
 uvicorn
 gunicorn
 pydantic
+pydantic-settings
 python-multipart
 anyio
 httpx
@@ -51,5 +52,5 @@ python-json-logger
 
 # Session Management
 redis
-# browser-use
-# playwright
+browser-use
+playwright

@@ -6,14 +6,18 @@ Handles government form assistance and PDF generation
 import logging
 from google.adk.agents import LlmAgent
 from google.adk.tools import FunctionTool
-
+browser_tools = mcp_playwright()
+portal_tools = FunctionTool(automate_government_portal)
 logger = logging.getLogger(__name__)
 
 async def create_form_agent():
     """Create form processing agent"""
     try:
-        # Create form processing tools
-        form_tools = await get_form_tools()
+        # Get internal tools (self-contained, no external dependencies)
+        
+        
+        # Combine all tools
+       
         
         agent = LlmAgent(
             name="form_agent",
@@ -67,18 +71,7 @@ async def create_form_agent():
             - Names: Must match official documents
             - Dates: Valid format (DD/MM/YYYY)
             - Phone numbers: Valid Uganda format (+256...)
-            - Addresses: Complete with district and parish
-            - ID numbers: Correct format for each document type
-            
-            Common Form Fields:
-            - Personal Information: Names, date of birth, gender
-            - Contact Information: Phone, email, address
-            - Identification: National ID, passport numbers
-            - Family Information: Parents, spouse, children
-            - Employment: Employer, occupation, salary
-            - Supporting Documents: List of required attachments
-            
-            Document Requirements by Form:
+            - Addresses: Complete with district and parish all_tools = []
             - Birth Certificate: Hospital delivery note, parent IDs
             - National ID: Birth certificate, passport photos
             - Tax Registration: Business license, bank details
@@ -478,7 +471,9 @@ async def get_form_tools():
         FunctionTool(validate_form_data),
         FunctionTool(generate_pdf_form),
         FunctionTool(get_submission_instructions),
-        FunctionTool(track_form_status)
+        FunctionTool(track_form_status),
+        browser_tools,
+        portal_tools,
     ]
     
     logger.info(f"Created {len(form_tools)} form processing tools")
